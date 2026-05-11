@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Nango from "@nangohq/frontend";
-import { api } from "@/lib/api";
+import { api, clearToken } from "@/lib/api";
 
 interface Connection {
   marketplace: string;
@@ -32,16 +32,11 @@ export default function ConnectionsPage() {
     setError(null);
     try {
       const { token } = await api.startConnect(marketplace);
-      const nango = new Nango({
-        publicKey: process.env.NEXT_PUBLIC_NANGO_PUBLIC_KEY ?? "",
-        connectSessionToken: token
-      });
-      // Opens the Nango Connect popup. Nango handles the OAuth dance,
-      // stores tokens, then fires the 'auth' webhook to our backend.
+      const nango = new Nango({ connectSessionToken: token });
       await nango.openConnectUI({
         onEvent: (event) => {
           if (event.type === "close") void load();
-        }
+        },
       });
     } catch (e) {
       setError((e as Error).message);
@@ -75,12 +70,34 @@ export default function ConnectionsPage() {
     }
   }
 
+  async function logout() {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787"}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { authorization: `Bearer ${window.localStorage.getItem("aonex.token") ?? ""}` },
+      });
+    } catch {
+      // best-effort — clear local state regardless
+    }
+    clearToken();
+    window.location.href = "/login";
+  }
+
   return (
     <main className="mx-auto max-w-3xl p-12">
       <h1 className="text-2xl font-semibold tracking-tight">Marketplace connections</h1>
-      <p className="mt-2 text-sm text-neutral-600">
-        Phase 1: Shopify is live. Amazon, eBay, Walmart, Etsy in upcoming phases.
-      </p>
+      <div className="mt-1 flex items-center justify-between">
+        <p className="text-sm text-neutral-600">
+          Phase 1: Shopify is live. Amazon, eBay, Walmart, Etsy in upcoming phases.
+        </p>
+        <button
+          onClick={() => void logout()}
+          className="text-sm text-neutral-500 hover:text-neutral-900 underline"
+        >
+          Sign out
+        </button>
+      </div>
 
       {error && (
         <div className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>

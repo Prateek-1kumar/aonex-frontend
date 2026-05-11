@@ -27,11 +27,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {})
-    }
+      ...(init.headers ?? {}),
+    },
   });
   const body = (await res.json()) as ApiEnvelope<T>;
   if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
