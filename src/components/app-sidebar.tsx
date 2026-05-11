@@ -7,19 +7,20 @@ import {
   Gauge, Database, LayoutGrid, Sparkles, BarChart3,
   Zap, Terminal, Lock, Circle,
 } from "lucide-react";
-import { api, getLocalProfile, type SystemHealth } from "@/lib/api";
+import { api, getLocalProfile, type SystemHealth, type UserProfile } from "@/lib/api";
 
 const NAV = [
-  { label: "Dashboard",       href: "/dashboard",       icon: Gauge },
-  { label: "Ingestion",       href: "/ingestion",       icon: Database },
-  { label: "Catalog",         href: "/catalog",         icon: LayoutGrid,  lockKey: "catalog" },
-  { label: "Enrichment",      href: "/enrichment",      icon: Sparkles,    lockKey: "enrichment" },
-  { label: "Analytics",       href: "/analytics",       icon: BarChart3,   lockKey: "analytics" },
-  { label: "Optimisation",    href: "/optimisation",    icon: Zap,         lockKey: "optimisation" },
-  { label: "Command Centre",  href: "/command-centre",  icon: Terminal,    lockKey: "command-centre" },
+  { label: "Dashboard",      href: "/dashboard",      icon: Gauge },
+  { label: "Ingestion",      href: "/ingestion",      icon: Database },
+  { label: "Catalog",        href: "/catalog",        icon: LayoutGrid, lockKey: "catalog" },
+  { label: "Enrichment",     href: "/enrichment",     icon: Sparkles,   lockKey: "enrichment" },
+  { label: "Analytics",      href: "/analytics",      icon: BarChart3,  lockKey: "analytics" },
+  { label: "Optimisation",   href: "/optimisation",   icon: Zap,        lockKey: "optimisation" },
+  { label: "Command Centre", href: "/command-centre", icon: Terminal,   lockKey: "command-centre" },
 ] as const;
 
 type LockKey = "catalog" | "enrichment" | "analytics" | "optimisation" | "command-centre";
+type NavItem = (typeof NAV)[number];
 
 function getLockedSections(hasConnections: boolean): Set<LockKey> {
   if (!hasConnections) {
@@ -28,24 +29,31 @@ function getLockedSections(hasConnections: boolean): Set<LockKey> {
   return new Set(["enrichment", "analytics", "optimisation", "command-centre"]);
 }
 
+function getLockKey(item: NavItem): LockKey | undefined {
+  return "lockKey" in item ? (item.lockKey as LockKey) : undefined;
+}
+
 function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const profile = getLocalProfile();
+  const [profile, setProfile] = useState<Partial<UserProfile>>(getLocalProfile());
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [lockedSections, setLockedSections] = useState<Set<LockKey>>(
     new Set(["catalog", "enrichment", "analytics", "optimisation", "command-centre"])
   );
 
   useEffect(() => {
+    // Real profile — works for both email login (Bearer) and Google OAuth (cookie).
+    api.me()
+      .then((p) => setProfile(p))
+      .catch(() => {
+        // Fall back to JWT decode if /me isn't reachable yet.
+        setProfile(getLocalProfile());
+      });
+
     api.listConnections()
       .then((conns) => setLockedSections(getLockedSections(conns.length > 0)))
       .catch(() => {});
@@ -69,27 +77,19 @@ export default function AppSidebar() {
   const displayName = profile.displayName ?? "User";
   const role = profile.role ?? "Member";
 
-  type NavItem = typeof NAV[number];
-  function getLockKey(item: NavItem): LockKey | undefined {
-    return "lockKey" in item ? (item.lockKey as LockKey) : undefined;
-  }
-
   return (
     <aside
       className="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/[0.06]"
       style={{ width: "var(--sidebar-width)", background: "hsl(var(--background))" }}
     >
       {/* Logo */}
-      <div className="px-6 pt-7 pb-6">
-        <span className="font-serif text-lg font-bold tracking-tight text-foreground">
-          AONEX
-        </span>
+      <div className="px-6 pt-7 pb-5">
+        <span className="font-serif text-lg font-bold tracking-tight text-foreground">AONEX</span>
         <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Global Control
         </p>
       </div>
 
-      {/* Divider */}
       <div className="mx-6 h-px bg-border/[0.06]" />
 
       {/* Nav */}
@@ -107,61 +107,30 @@ export default function AppSidebar() {
               className={[
                 "relative flex items-center gap-3 rounded-lg px-3 h-10 text-sm transition-all duration-150",
                 active
-                  ? "nav-active text-primary/100 bg-primary/5"
+                  ? "nav-active bg-primary/5"
                   : locked
-                    ? "text-muted-foreground/40 pointer-events-none"
+                    ? "pointer-events-none opacity-40"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
               ].join(" ")}
+              style={active ? { color: "hsl(var(--primary))" } : undefined}
             >
               <Icon size={15} className="shrink-0" />
-              <span className={`flex-1 font-medium ${active ? "text-[hsl(var(--primary))]" : ""}`}>
-                {label}
-              </span>
-              {locked && <Lock size={11} className="shrink-0 opacity-40" />}
+              <span className="flex-1 font-medium">{label}</span>
+              {locked && <Lock size={11} className="shrink-0" />}
             </Link>
           );
         })}
       </nav>
 
-      {/* Divider */}
-      <div className="mx-6 h-px bg-border/[0.06]" />
-
-      {/* System status */}
-      <div className="px-6 py-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Circle size={7} className={`fill-current ${statusColor}`} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {health?.status === "degraded"
-              ? "Degraded"
-              : health?.status === "offline"
-                ? "Offline"
-                : "Optimal Performance"}
-          </span>
-        </div>
-
-        {health && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] text-muted-foreground/60">
-              <span className="uppercase tracking-widest font-medium">System Load</span>
-              <span className="font-mono">{health.loadPercent}%</span>
-            </div>
-            <div className="h-0.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary/80 transition-all duration-700"
-                style={{ width: `${health.loadPercent}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Divider */}
       <div className="mx-6 h-px bg-border/[0.06]" />
 
       {/* User */}
       <div className="px-4 py-4 flex items-center gap-3">
-        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-border/[0.08]">
-          <span className="text-[11px] font-bold text-primary/100">
+        <div
+          className="size-8 rounded-full flex items-center justify-center shrink-0 border border-border/[0.08]"
+          style={{ background: "hsl(var(--primary) / 0.1)" }}
+        >
+          <span className="text-[11px] font-bold" style={{ color: "hsl(var(--primary))" }}>
             {getInitials(displayName)}
           </span>
         </div>
