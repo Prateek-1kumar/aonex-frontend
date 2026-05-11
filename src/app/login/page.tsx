@@ -32,7 +32,7 @@ function LoginForm() {
     try {
       const { token } = await api.login(email, password);
       setToken(token);
-      router.push("/connections");
+      router.push("/dashboard");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
