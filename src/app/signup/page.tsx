@@ -1,36 +1,28 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, setToken } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
-const GOOGLE_ERRORS: Record<string, string> = {
-  google_denied: "Google sign-in was cancelled.",
-  state_mismatch: "Security check failed. Please try again.",
-  google_token_failed: "Could not connect to Google. Please try again.",
-  google_userinfo_failed: "Could not retrieve your Google account info.",
-  session_expired: "Your session expired. Please sign in again.",
-};
-
-function LoginForm() {
+export default function SignupPage() {
   const router = useRouter();
-  const params = useSearchParams();
-  const oauthError = params.get("error");
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ email: "", password: "", displayName: "", tenantName: "" });
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function set(field: keyof typeof form) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [field]: e.target.value }));
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      const { token } = await api.login(email, password);
+      const { token } = await api.signup(form.email, form.password, form.displayName, form.tenantName);
       setToken(token);
       router.push("/connections");
     } catch (e) {
@@ -42,8 +34,8 @@ function LoginForm() {
 
   return (
     <main className="mx-auto max-w-sm p-12">
-      <h1 className="font-serif text-3xl font-medium tracking-tight">Sign in</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Welcome back to Aonex.</p>
+      <h1 className="font-serif text-3xl font-medium tracking-tight">Create your account</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Start managing your catalog across all channels.</p>
 
       <a
         href={`${API}/api/auth/google`}
@@ -60,57 +52,42 @@ function LoginForm() {
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <label className="block text-sm">
-          <span className="font-medium">Email</span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Password</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </label>
+        <Field label="Full name" type="text" autoComplete="name" required value={form.displayName} onChange={set("displayName")} />
+        <Field label="Work email" type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
+        <Field label="Password" type="password" autoComplete="new-password" required minLength={8} value={form.password} onChange={set("password")} />
+        <Field label="Workspace name" type="text" autoComplete="organization" required value={form.tenantName} onChange={set("tenantName")} placeholder="e.g. Acme Store" />
 
-        {(err ?? (oauthError ? GOOGLE_ERRORS[oauthError] : null)) && (
-          <p className="text-sm text-red-600">{err ?? GOOGLE_ERRORS[oauthError!]}</p>
-        )}
+        {err && <p className="text-sm text-red-600">{err}</p>}
 
         <button
           type="submit"
           disabled={loading}
           className="w-full border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-transparent hover:text-primary disabled:opacity-50"
         >
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? "Creating account…" : "Create account"}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        No account?{" "}
-        <Link href="/signup" className="font-medium text-foreground underline-offset-4 hover:underline">
-          Create one
+        Already have an account?{" "}
+        <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+          Sign in
         </Link>
       </p>
     </main>
   );
 }
 
-export default function LoginPage() {
+function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  const { label, ...rest } = props;
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    <label className="block text-sm">
+      <span className="font-medium">{label}</span>
+      <input
+        {...rest}
+        className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+    </label>
   );
 }
 

@@ -47,6 +47,18 @@ export const api = {
       body: JSON.stringify({ email, password })
     });
   },
+  signup(email: string, password: string, displayName: string, tenantName: string) {
+    return request<{ token: string; expiresAt: string }>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password, displayName, tenantName })
+    });
+  },
+  googleComplete(tenantName: string, pendingToken: string) {
+    return request<{ token: string; expiresAt: string }>("/api/auth/google/complete", {
+      method: "POST",
+      body: JSON.stringify({ tenantName, pendingToken })
+    });
+  },
   listConnections() {
     return request<
       Array<{ marketplace: string; status: string; connectedAt?: string }>
