@@ -19,17 +19,67 @@ export interface SystemHealth {
   loadPercent: number;
 }
 
+export interface ReviewTask {
+  id: string;
+  severity: "low" | "medium" | "high" | "critical";
+  taskType: string;
+  status: "open" | "in_progress" | "resolved" | "dismissed";
+  createdAt: string;
+  proposed_diff: {
+    id: string;
+    confidenceScore: string;
+    diffPayload: Record<string, unknown>;
+  } | null;
+  fields: Array<{
+    id: string;
+    fieldName: string;
+    oldValue: unknown;
+    newValue: unknown;
+    confidence: string;
+  }>;
+  source_artifact: {
+    id: string;
+    sourceExternalId: string;
+    rawData: Record<string, unknown>;
+    status: string;
+  } | null;
+}
+
+export interface CatalogProduct {
+  id: string;
+  status: string;
+  canonicalCategory: string | null;
+  updatedAt: string;
+  current_version: {
+    id: string;
+    title: string;
+    brand: string | null;
+    gtin: string | null;
+    modelNumber: string | null;
+    basePrice: string | null;
+    currency: string | null;
+    images: Array<{ url: string; altText?: string }>;
+    description: string | null;
+    confidenceScore: string;
+    merchantExtensionsJson?: Record<string, unknown>;
+  } | null;
+  variants: Array<Record<string, unknown>>;
+}
+
 function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("aonex.token");
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(^| )aonex_token=([^;]+)`));
+  return match ? (match[2] ?? null) : null;
 }
 
 export function setToken(token: string): void {
-  window.localStorage.setItem("aonex.token", token);
+  // No-op. Kept for typescript compatibility, but cookie is handled server-side now.
 }
 
 export function clearToken(): void {
-  window.localStorage.removeItem("aonex.token");
+  if (typeof window !== "undefined") {
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+  }
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
@@ -57,17 +107,21 @@ export function getLocalProfile(): Partial<UserProfile> {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API}${path}`, {
     ...init,
     credentials: "include",
     headers: {
       "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(init.headers ?? {}),
     },
   });
   const body = (await res.json()) as ApiEnvelope<T>;
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== "undefined") {
+      window.location.href = "/login?error=session_expired";
+    }
+  }
   if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
   if (!body.data) throw new Error("Malformed response (missing data)");
   return body.data;
@@ -75,9 +129,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   login(email: string, password: string) {
-    return request<{ token: string; expiresAt: string }>("/api/auth/login", {
+    return fetch("/api/auth/login", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
+    }).then(async res => {
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message ?? "Login failed");
+      return body as { token: string; expiresAt: string };
     });
   },
   signup(email: string, password: string, displayName: string, tenantName: string) {
@@ -121,13 +180,11 @@ export const api = {
     });
   },
   uploadCsv(file: File) {
-    const token = getToken();
     const form = new FormData();
     form.append("file", file);
     return fetch(`${API}/api/ingestion/upload`, {
       method: "POST",
       credentials: "include",
-      headers: token ? { authorization: `Bearer ${token}` } : {},
       body: form,
     }).then(async (res) => {
       const body = (await res.json()) as ApiEnvelope<{ ingestionId: string; rowCount: number }>;
@@ -136,10 +193,32 @@ export const api = {
       return body.data;
     });
   },
-  submitUrl(url: string) {
-    return request<{ ingestionId: string }>("/api/ingestion/url", {
+  importLink(url: string, category_hint?: string) {
+    return fetch(`/api/ingestions/link`, {
       method: "POST",
-      body: JSON.stringify({ url }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, category_hint }),
+    }).then(async res => {
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error?.message ?? "Import failed");
+      return body.data as {
+        ingestion_id: string;
+        status: string;
+        trace_id: string;
+        url: string;
+      };
     });
+  },
+  listReviewTasks(status = "open") {
+    return request<{ tasks: ReviewTask[] }>(`/api/review/tasks?status=${encodeURIComponent(status)}`);
+  },
+  resolveReviewTask(id: string, action: "save" | "approve" | "reject" | "dismiss", diff_payload?: Record<string, unknown>, resolution_notes?: string) {
+    return request<{ task_id: string; status: string; catalog?: Record<string, unknown> }>(`/api/review/tasks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ action, diff_payload, resolution_notes }),
+    });
+  },
+  listCatalogProducts() {
+    return request<{ products: CatalogProduct[] }>("/api/catalog/products");
   },
 };

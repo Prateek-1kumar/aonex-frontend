@@ -1,0 +1,7 @@
+--- a/apps/api/src/routes/auth.ts
++++ b/apps/api/src/routes/auth.ts
+@@ -101,6 +101,7 @@ export function authRoutes(deps: AuthDeps): Hono {
+ 
+     return c.json({ data: { token, expiresAt: expiresAt.toISOString() } });
+   });
++

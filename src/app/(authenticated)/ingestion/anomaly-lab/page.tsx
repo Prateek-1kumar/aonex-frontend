@@ -1,149 +1,107 @@
 "use client";
 
-import { useState } from "react";
-import { Check, X, GitMerge, Flag, Edit3, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Check, CheckCircle2, Loader2, RefreshCw, X } from "lucide-react";
+import { api, type ReviewTask } from "@/lib/api";
 
-type Severity = "high" | "medium" | "low";
-type TaskType = "low_confidence" | "missing_attribute" | "duplicate" | "category_ambiguous" | "channel_error";
+type Toast = { type: "success" | "error"; message: string } | null;
 
-interface AnomalyTask {
-  id: string;
-  severity: Severity;
-  type: TaskType;
-  sku: string;
-  age: string;
-  field: string;
-  rawValue: string;
-  source: string;
-  candidates: { label: string; confidence: number }[];
-}
-
-const MOCK_TASKS: AnomalyTask[] = [
-  {
-    id: "1",
-    severity: "high",
-    type: "missing_attribute",
-    sku: "SKU-4821",
-    age: "2 min ago",
-    field: "battery_capacity_mah",
-    rawValue: "5000",
-    source: "Row 42, CSV upload",
-    candidates: [
-      { label: "battery_capacity_mah", confidence: 0.94 },
-      { label: "storage_gb",           confidence: 0.21 },
-      { label: "volume_ml",            confidence: 0.18 },
-    ],
-  },
-  {
-    id: "2",
-    severity: "medium",
-    type: "low_confidence",
-    sku: "SKU-3302",
-    age: "14 min ago",
-    field: "resolution",
-    rawValue: "4K Ultra HD",
-    source: "Shopify connector",
-    candidates: [
-      { label: "display_resolution", confidence: 0.71 },
-      { label: "screen_size",        confidence: 0.34 },
-      { label: "refresh_rate",       confidence: 0.12 },
-    ],
-  },
-  {
-    id: "3",
-    severity: "low",
-    type: "category_ambiguous",
-    sku: "SKU-1109",
-    age: "1 hr ago",
-    field: "category_path",
-    rawValue: "Electronics > Audio",
-    source: "CSV upload",
-    candidates: [
-      { label: "Headphones",      confidence: 0.62 },
-      { label: "Speakers",        confidence: 0.58 },
-      { label: "Audio Accessory", confidence: 0.41 },
-    ],
-  },
-];
-
-const FILTERS: { label: string; value: string }[] = [
-  { label: "All",                value: "all" },
-  { label: "Low Confidence",     value: "low_confidence" },
-  { label: "Missing Attribute",  value: "missing_attribute" },
-  { label: "Duplicate",          value: "duplicate" },
-  { label: "Category Ambiguous", value: "category_ambiguous" },
-  { label: "Channel Error",      value: "channel_error" },
-];
-
-const TYPE_LABELS: Record<TaskType, string> = {
-  low_confidence:     "Low Confidence",
-  missing_attribute:  "Missing Attribute",
-  duplicate:          "Duplicate",
-  category_ambiguous: "Category Ambiguous",
-  channel_error:      "Channel Error",
-};
-
-const SEVERITY_DOT: Record<Severity, string> = {
-  high:   "bg-red-400",
+const SEVERITY_DOT: Record<string, string> = {
+  critical: "bg-red-500",
+  high: "bg-red-400",
   medium: "bg-amber-400",
-  low:    "bg-muted-foreground/40",
+  low: "bg-muted-foreground/40",
 };
 
 export default function AnomalyLabPage() {
-  const [tasks, setTasks] = useState(MOCK_TASKS);
-  const [selected, setSelected] = useState<AnomalyTask | null>(MOCK_TASKS[0] ?? null);
-  const [filter, setFilter] = useState("all");
+  const [tasks, setTasks] = useState<ReviewTask[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState<string | null>("load");
+  const [toast, setToast] = useState<Toast>(null);
 
-  const visible = filter === "all" ? tasks : tasks.filter((t) => t.type === filter);
+  const selected = useMemo(
+    () => tasks.find((task) => task.id === selectedId) ?? tasks[0] ?? null,
+    [tasks, selectedId]
+  );
 
-  function resolve(id: string) {
-    const remaining = tasks.filter((t) => t.id !== id);
-    setTasks(remaining);
-    setSelected(remaining[0] ?? null);
+  useEffect(() => {
+    void loadTasks();
+  }, []);
+
+  useEffect(() => {
+    if (!selected?.proposed_diff?.diffPayload) {
+      setDraft("");
+      return;
+    }
+    setDraft(JSON.stringify(selected.proposed_diff.diffPayload, null, 2));
+  }, [selected?.id]);
+
+  async function loadTasks() {
+    setBusy("load");
+    try {
+      const res = await api.listReviewTasks("open");
+      setTasks(res.tasks);
+      setSelectedId(res.tasks[0]?.id ?? null);
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function showToast(t: Toast) {
+    setToast(t);
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  async function resolve(action: "approve" | "reject") {
+    if (!selected) return;
+    setBusy(action);
+    try {
+      const payload = draft.trim() ? JSON.parse(draft) as Record<string, unknown> : undefined;
+      await api.resolveReviewTask(selected.id, action, payload, action === "approve" ? "Approved in Anomaly Lab" : "Rejected in Anomaly Lab");
+      const remaining = tasks.filter((task) => task.id !== selected.id);
+      setTasks(remaining);
+      setSelectedId(remaining[0]?.id ?? null);
+      showToast({ type: "success", message: action === "approve" ? "Approved into catalog." : "Rejected." });
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
     <div className="animate-in h-full">
-      {/* Header */}
       <div className="mb-6">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-serif text-4xl font-bold text-foreground">Anomaly Lab</h1>
             <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               Human Verification Queue
             </p>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            {tasks.length > 0 && (
-              <>
-                <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary/100 text-xs font-bold">
-                  {tasks.length} pending
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 text-xs font-bold">
-                  {tasks.filter((t) => t.severity === "high").length} high
-                </span>
-              </>
-            )}
-          </div>
+          <button
+            onClick={() => void loadTasks()}
+            disabled={busy !== null}
+            className="size-9 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center disabled:opacity-40"
+          >
+            {busy === "load" ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-1 mt-5 flex-wrap">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={[
-                "px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider transition-colors",
-                filter === f.value
-                  ? "bg-primary/10 text-primary/100 border border-primary/20"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
-              ].join(" ")}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {toast && (
+          <div className={[
+            "mt-5 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
+            toast.type === "success"
+              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+              : "bg-red-500/10 border border-red-500/20 text-red-400",
+          ].join(" ")}>
+            {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+            {toast.message}
+          </div>
+        )}
       </div>
 
       {tasks.length === 0 ? (
@@ -153,110 +111,84 @@ export default function AnomalyLabPage() {
           <p className="mt-1 text-sm text-muted-foreground">No items need review.</p>
         </div>
       ) : (
-        <div className="flex gap-4" style={{ height: "calc(100vh - 280px)" }}>
-          {/* Task list */}
-          <div className="w-72 shrink-0 flex flex-col gap-2 overflow-y-auto scrollbar-thin pr-1">
-            {visible.map((task) => (
-              <button
-                key={task.id}
-                onClick={() => setSelected(task)}
-                className={[
-                  "w-full text-left rounded-xl border p-4 transition-all duration-150",
-                  selected?.id === task.id
-                    ? "border-primary/25 bg-primary/5"
-                    : "border-border/[0.07] bg-card hover:border-border/[0.12] hover:bg-white/[0.02]",
-                ].join(" ")}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`size-2 rounded-full shrink-0 ${SEVERITY_DOT[task.severity]}`} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {task.severity}
-                  </span>
-                </div>
-                <p className="text-sm font-semibold text-foreground/90">{TYPE_LABELS[task.type]}</p>
-                <p className="text-xs text-muted-foreground/60 mt-0.5">{task.sku}</p>
-                <p className="text-[10px] text-muted-foreground/40 mt-2">{task.age}</p>
-              </button>
-            ))}
+        <div className="flex gap-4" style={{ height: "calc(100vh - 250px)" }}>
+          <div className="w-80 shrink-0 flex flex-col gap-2 overflow-y-auto scrollbar-thin pr-1">
+            {tasks.map((task) => {
+              const payload = task.proposed_diff?.diffPayload ?? {};
+              const title = typeof payload.title === "string" ? payload.title : "Untitled product";
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => setSelectedId(task.id)}
+                  className={[
+                    "w-full text-left rounded-xl border p-4 transition-all duration-150",
+                    selected?.id === task.id
+                      ? "border-primary/25 bg-primary/5"
+                      : "border-border/[0.07] bg-card hover:border-border/[0.12] hover:bg-white/[0.02]",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`size-2 rounded-full shrink-0 ${SEVERITY_DOT[task.severity] ?? SEVERITY_DOT.low}`} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {task.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground/90 line-clamp-2">{title}</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">{task.taskType}</p>
+                  <p className="text-[10px] text-muted-foreground/40 mt-2">
+                    {new Date(task.createdAt).toLocaleString()}
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Review panel */}
           {selected && (
             <div className="flex-1 rounded-xl border border-border/[0.08] bg-card p-6 overflow-y-auto scrollbar-thin">
               <div className="space-y-6">
-                {/* Source evidence */}
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3">
-                    Source Evidence
+                    Proposed Canonical Payload
                   </p>
-                  <div className="rounded-lg bg-white/[0.03] border border-border/[0.06] p-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Field</span>
-                      <span className="font-mono text-foreground/90">{selected.field}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Raw value</span>
-                      <span className="font-mono text-primary/90">"{selected.rawValue}"</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Extracted from</span>
-                      <span className="text-foreground/70">{selected.source}</span>
-                    </div>
-                  </div>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    spellCheck={false}
+                    className="h-80 w-full resize-none rounded-lg border border-border/[0.08] bg-white/[0.03] p-4 font-mono text-xs leading-5 text-foreground/80 outline-none focus:border-primary/30"
+                  />
                 </div>
 
-                {/* Candidates */}
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3">
-                    Mapping Candidates
+                    Field Evidence
                   </p>
                   <div className="space-y-2">
-                    {selected.candidates.map((c, i) => (
-                      <div key={c.label} className="flex items-center gap-3">
-                        <span className="text-[10px] text-muted-foreground/40 w-4 font-mono">{i + 1}</span>
-                        <div className="flex-1 flex items-center justify-between rounded-lg bg-white/[0.03] border border-border/[0.05] px-3 py-2">
-                          <span className="text-sm font-mono text-foreground/80">{c.label}</span>
-                          <span className={[
-                            "text-xs font-bold tabular-nums",
-                            c.confidence >= 0.8 ? "text-emerald-400" :
-                            c.confidence >= 0.5 ? "text-amber-400" : "text-muted-foreground",
-                          ].join(" ")}>
-                            {(c.confidence * 100).toFixed(0)}%
-                          </span>
-                        </div>
+                    {selected.fields.map((field) => (
+                      <div key={field.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-border/[0.05] px-3 py-2 gap-4">
+                        <span className="text-sm font-mono text-foreground/80 truncate">{field.fieldName}</span>
+                        <span className="text-xs font-bold tabular-nums text-muted-foreground">
+                          {(Number(field.confidence) * 100).toFixed(0)}%
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3">
-                    Actions
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => resolve(selected.id)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary/100 text-xs font-semibold hover:bg-primary/20 transition-colors"
-                    >
-                      <Check size={13} /> Approve as-is
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 text-xs font-semibold hover:bg-white/[0.07] transition-colors">
-                      <Edit3 size={13} /> Edit + Approve
-                    </button>
-                    <button
-                      onClick={() => resolve(selected.id)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-red-400/80 text-xs font-semibold hover:bg-red-500/10 transition-colors"
-                    >
-                      <X size={13} /> Reject
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 text-xs font-semibold hover:bg-white/[0.07] transition-colors">
-                      <GitMerge size={13} /> Merge
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 text-xs font-semibold hover:bg-white/[0.07] transition-colors">
-                      <Flag size={13} /> Escalate
-                    </button>
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => void resolve("approve")}
+                    disabled={busy !== null}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary/100 text-xs font-semibold hover:bg-primary/20 transition-colors disabled:opacity-40"
+                  >
+                    <Check size={13} /> Approve to Catalog
+                  </button>
+                  <button
+                    onClick={() => void resolve("reject")}
+                    disabled={busy !== null}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-red-400/80 text-xs font-semibold hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                  >
+                    <X size={13} /> Reject
+                  </button>
                 </div>
               </div>
             </div>

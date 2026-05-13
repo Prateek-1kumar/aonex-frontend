@@ -1,0 +1,14 @@
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -60,6 +60,12 @@
+     },
+   });
+   const body = (await res.json()) as ApiEnvelope<T>;
++  if (res.status === 401) {
++    if (typeof window !== "undefined") {
++      window.location.href = "/login?error=session_expired";
++    }
++  }
+   if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+   if (!body.data) throw new Error("Malformed response (missing data)");
+   return body.data;

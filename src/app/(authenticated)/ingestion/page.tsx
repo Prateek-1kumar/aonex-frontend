@@ -71,8 +71,8 @@ export default function IngestionPage() {
     if (!url.trim()) return;
     setBusy("url");
     try {
-      await api.submitUrl(url.trim());
-      showToast({ type: "success", message: "URL submitted — extracting product data." });
+      await api.importLink(url.trim());
+      showToast({ type: "success", message: "URL accepted — canonical extraction has started." });
       setUrl("");
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
@@ -191,7 +191,7 @@ export default function IngestionPage() {
                 <Plus size={16} />
               </button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground/50 leading-relaxed">
+            <p className="mt-3 text-xs text-muted-foreground/50 leading-relaxed mb-4">
               Paste a marketplace listing URL to extract one product.
             </p>
           </div>
