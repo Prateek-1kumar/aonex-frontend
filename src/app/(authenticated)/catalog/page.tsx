@@ -33,7 +33,7 @@ export default function CatalogPage() {
   }
 
   return (
-    <div className="animate-in max-w-6xl">
+    <div className="animate-in max-w-8xl">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl font-bold text-foreground">Catalog</h1>
