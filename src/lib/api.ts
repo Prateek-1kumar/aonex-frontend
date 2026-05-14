@@ -1,3 +1,9 @@
+import type {
+  ReviewCluster,
+  ReviewTaskDetail,
+  TaskEvidence,
+} from "@/app/(authenticated)/ingestion/anomaly-lab/types";
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export interface ApiEnvelope<T> {
@@ -217,6 +223,56 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ action, diff_payload, resolution_notes }),
     });
+  },
+  listReviewClusters(status: "open" | "resolved" = "open"): Promise<ReviewCluster[]> {
+    return request<{ clusters: ReviewCluster[] }>(`/v1/review/clusters?status=${status}`).then(d => d.clusters ?? []);
+  },
+  listClusterItems(clusterKey: string): Promise<ReviewTaskDetail[]> {
+    return request<{ items: ReviewTaskDetail[] }>(`/v1/review/clusters/${encodeURIComponent(clusterKey)}/items`).then(d => d.items ?? []);
+  },
+  resolveCluster(
+    clusterKey: string,
+    action: "approve_all" | "reject_all",
+    bulkEdit?: { fieldName: string; newValue: unknown }
+  ): Promise<{ resolvedCount: number; overridesCreated: number }> {
+    return request<{ resolvedCount: number; overridesCreated: number }>(
+      `/v1/review/clusters/${encodeURIComponent(clusterKey)}/resolve`,
+      { method: "POST", body: JSON.stringify({ action, bulkEdit }) }
+    );
+  },
+  editAndApprove(
+    taskId: string,
+    payload: {
+      fieldName: string;
+      newCanonicalPath: string | null;
+      newNormalizedValue: unknown;
+      pickedCandidateSource?: string;
+      reason?: string;
+    }
+  ): Promise<{ overrideId: string | null }> {
+    return request<{ overrideId: string | null }>(
+      `/v1/review/tasks/${encodeURIComponent(taskId)}/edit-and-approve`,
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+  },
+  rejectTask(
+    taskId: string,
+    reason: "wrong_value" | "missing_field" | "wrong_category" | "no_product_found",
+    note?: string
+  ): Promise<{ failureId: string }> {
+    return request<{ failureId: string }>(
+      `/v1/review/tasks/${encodeURIComponent(taskId)}/reject`,
+      { method: "POST", body: JSON.stringify({ reason, note }) }
+    );
+  },
+  mergeTask(taskId: string, existingProductId: string): Promise<{ aliasId: string }> {
+    return request<{ aliasId: string }>(
+      `/v1/review/tasks/${encodeURIComponent(taskId)}/merge`,
+      { method: "POST", body: JSON.stringify({ existingProductId }) }
+    );
+  },
+  getTaskEvidence(taskId: string): Promise<TaskEvidence> {
+    return request<TaskEvidence>(`/v1/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
   listCatalogProducts() {
     return request<{ products: CatalogProduct[] }>("/api/catalog/products");
