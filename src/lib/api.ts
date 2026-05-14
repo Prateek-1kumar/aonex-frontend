@@ -225,10 +225,10 @@ export const api = {
     });
   },
   listReviewClusters(status: "open" | "resolved" = "open"): Promise<ReviewCluster[]> {
-    return request<{ clusters: ReviewCluster[] }>(`/v1/review/clusters?status=${status}`).then(d => d.clusters ?? []);
+    return request<{ clusters: ReviewCluster[] }>(`/api/review/clusters?status=${status}`).then(d => d.clusters ?? []);
   },
   listClusterItems(clusterKey: string): Promise<ReviewTaskDetail[]> {
-    return request<{ items: ReviewTaskDetail[] }>(`/v1/review/clusters/${encodeURIComponent(clusterKey)}/items`).then(d => d.items ?? []);
+    return request<{ items: ReviewTaskDetail[] }>(`/api/review/clusters/${encodeURIComponent(clusterKey)}/items`).then(d => d.items ?? []);
   },
   resolveCluster(
     clusterKey: string,
@@ -236,7 +236,7 @@ export const api = {
     bulkEdit?: { fieldName: string; newValue: unknown }
   ): Promise<{ resolvedCount: number; overridesCreated: number }> {
     return request<{ resolvedCount: number; overridesCreated: number }>(
-      `/v1/review/clusters/${encodeURIComponent(clusterKey)}/resolve`,
+      `/api/review/clusters/${encodeURIComponent(clusterKey)}/resolve`,
       { method: "POST", body: JSON.stringify({ action, bulkEdit }) }
     );
   },
@@ -251,7 +251,7 @@ export const api = {
     }
   ): Promise<{ overrideId: string | null }> {
     return request<{ overrideId: string | null }>(
-      `/v1/review/tasks/${encodeURIComponent(taskId)}/edit-and-approve`,
+      `/api/review/tasks/${encodeURIComponent(taskId)}/edit-and-approve`,
       { method: "POST", body: JSON.stringify(payload) }
     );
   },
@@ -261,18 +261,18 @@ export const api = {
     note?: string
   ): Promise<{ failureId: string }> {
     return request<{ failureId: string }>(
-      `/v1/review/tasks/${encodeURIComponent(taskId)}/reject`,
+      `/api/review/tasks/${encodeURIComponent(taskId)}/reject`,
       { method: "POST", body: JSON.stringify({ reason, note }) }
     );
   },
   mergeTask(taskId: string, existingProductId: string): Promise<{ aliasId: string }> {
     return request<{ aliasId: string }>(
-      `/v1/review/tasks/${encodeURIComponent(taskId)}/merge`,
+      `/api/review/tasks/${encodeURIComponent(taskId)}/merge`,
       { method: "POST", body: JSON.stringify({ existingProductId }) }
     );
   },
   getTaskEvidence(taskId: string): Promise<TaskEvidence> {
-    return request<TaskEvidence>(`/v1/review/tasks/${encodeURIComponent(taskId)}/evidence`);
+    return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
   listCatalogProducts() {
     return request<{ products: CatalogProduct[] }>("/api/catalog/products");
