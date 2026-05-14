@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api, type CatalogProduct } from "@/lib/api";
 import { ProductDetailModal } from "./components/ProductDetailModal";
+import { getDisplayPrice } from "./lib/price";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 type StatusFilter = "all" | "active" | "draft";
@@ -209,12 +210,7 @@ function ProductRow({
 }) {
   const v = product.current_version;
   const confidence = v ? Number(v.confidenceScore) * 100 : 0;
-  const price =
-    v?.basePrice && v.currency
-      ? `${v.currency} ${Number(v.basePrice).toLocaleString()}`
-      : v?.basePrice
-        ? Number(v.basePrice).toLocaleString()
-        : null;
+  const price = getDisplayPrice(product);
 
   const statusTone =
     product.status === "archived"
@@ -267,7 +263,7 @@ function ProductRow({
       </div>
 
       <div className="text-right shrink-0">
-        <p className="text-sm font-bold tabular-nums text-foreground/90">{price ?? "—"}</p>
+        <p className="text-sm font-bold tabular-nums text-foreground/90">{price?.text ?? "—"}</p>
         <p className={`mt-0.5 text-[10px] font-bold tabular-nums ${confTone}`}>
           {confidence.toFixed(0)}% confident
         </p>

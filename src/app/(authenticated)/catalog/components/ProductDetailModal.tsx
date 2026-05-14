@@ -14,6 +14,7 @@ import {
   Tag,
 } from "lucide-react";
 import type { CatalogProduct } from "@/lib/api";
+import { getDisplayPrice } from "../lib/price";
 
 interface Props {
   product: CatalogProduct;
@@ -52,12 +53,9 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
   }
 
   const confidence = v ? Number(v.confidenceScore) * 100 : 0;
-  const price =
-    v?.basePrice && v.currency
-      ? `${v.currency} ${Number(v.basePrice).toLocaleString()}`
-      : v?.basePrice
-        ? Number(v.basePrice).toLocaleString()
-        : null;
+  const displayPrice = getDisplayPrice(product);
+  const priceText = displayPrice?.text ?? "—";
+  const priceLabel = displayPrice?.isRange ? "Price range" : "Price";
 
   const statusTone =
     product.status === "archived"
@@ -162,7 +160,7 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
             </h2>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <Stat label="Price" value={price ?? "—"} />
+              <Stat label={priceLabel} value={priceText} />
               <Stat
                 label="Confidence"
                 value={`${confidence.toFixed(0)}%`}
