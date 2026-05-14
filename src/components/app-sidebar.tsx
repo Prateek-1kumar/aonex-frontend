@@ -12,19 +12,19 @@ import { api, getLocalProfile, type SystemHealth, type UserProfile } from "@/lib
 const NAV = [
   { label: "Dashboard",      href: "/dashboard",      icon: Gauge },
   { label: "Ingestion",      href: "/ingestion",      icon: Database },
-  { label: "Catalog",        href: "/catalog",        icon: LayoutGrid, lockKey: "catalog" },
+  { label: "Catalog",        href: "/catalog",        icon: LayoutGrid },
   { label: "Enrichment",     href: "/enrichment",     icon: Sparkles,   lockKey: "enrichment" },
   { label: "Analytics",      href: "/analytics",      icon: BarChart3,  lockKey: "analytics" },
   { label: "Optimisation",   href: "/optimisation",   icon: Zap,        lockKey: "optimisation" },
   { label: "Command Centre", href: "/command-centre", icon: Terminal,   lockKey: "command-centre" },
 ] as const;
 
-type LockKey = "catalog" | "enrichment" | "analytics" | "optimisation" | "command-centre";
+type LockKey = "enrichment" | "analytics" | "optimisation" | "command-centre";
 type NavItem = (typeof NAV)[number];
 
 function getLockedSections(hasConnections: boolean): Set<LockKey> {
   if (!hasConnections) {
-    return new Set(["catalog", "enrichment", "analytics", "optimisation", "command-centre"]);
+    return new Set(["enrichment", "analytics", "optimisation", "command-centre"]);
   }
   return new Set(["enrichment", "analytics", "optimisation", "command-centre"]);
 }
@@ -42,7 +42,7 @@ export default function AppSidebar() {
   const [profile, setProfile] = useState<Partial<UserProfile>>(getLocalProfile());
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [lockedSections, setLockedSections] = useState<Set<LockKey>>(
-    new Set(["catalog", "enrichment", "analytics", "optimisation", "command-centre"])
+    new Set(["enrichment", "analytics", "optimisation", "command-centre"])
   );
 
   useEffect(() => {

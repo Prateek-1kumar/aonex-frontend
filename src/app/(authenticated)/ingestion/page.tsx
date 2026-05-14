@@ -27,6 +27,7 @@ export default function IngestionPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [url, setUrl] = useState("");
+  const [categoryHint, setCategoryHint] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [conns, setConns] = useState<Connection[]>([]);
@@ -71,9 +72,10 @@ export default function IngestionPage() {
     if (!url.trim()) return;
     setBusy("url");
     try {
-      await api.importLink(url.trim());
+      await api.importLink(url.trim(), categoryHint.trim() || undefined);
       showToast({ type: "success", message: "URL accepted — canonical extraction has started." });
       setUrl("");
+      setCategoryHint("");
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
@@ -95,7 +97,7 @@ export default function IngestionPage() {
   }
 
   return (
-    <div className="animate-in max-w-6xl">
+    <div className="animate-in max-w-8xl">
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-serif text-4xl font-bold text-foreground">Ingestion Terminal</h1>
@@ -174,22 +176,32 @@ export default function IngestionPage() {
                 External Link
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handleUrl(); }}
                 placeholder="https://amazon.com/dp/…"
-                className="flex-1 bg-white/[0.04] border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
+                className="w-full bg-white/[0.04] border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
               />
-              <button
-                onClick={() => void handleUrl()}
-                disabled={busy === "url" || !url.trim()}
-                className="size-9 rounded-lg bg-primary/10 text-primary/100 hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
-              >
-                <Plus size={16} />
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={categoryHint}
+                  onChange={(e) => setCategoryHint(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleUrl(); }}
+                  placeholder="Category hint e.g., 'Running Shoes' (Optional)"
+                  className="flex-1 bg-white/[0.04] border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
+                />
+                <button
+                  onClick={() => void handleUrl()}
+                  disabled={busy === "url" || !url.trim()}
+                  className="px-4 rounded-lg bg-primary/10 text-primary/100 hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground/50 leading-relaxed mb-4">
               Paste a marketplace listing URL to extract one product.
