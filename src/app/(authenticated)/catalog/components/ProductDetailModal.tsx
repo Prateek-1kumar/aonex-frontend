@@ -348,10 +348,10 @@ function Stat({
 }: {
   label: string;
   value: string;
-  tone?: "emerald" | "amber" | "red";
-  copyable?: { label: string; value: string };
-  onCopy?: (label: string, value: string) => void;
-  copied?: string | null;
+  tone?: "emerald" | "amber" | "red" | undefined;
+  copyable?: { label: string; value: string } | undefined;
+  onCopy?: ((label: string, value: string) => void) | undefined;
+  copied?: string | null | undefined;
 }) {
   const toneClass =
     tone === "emerald"
