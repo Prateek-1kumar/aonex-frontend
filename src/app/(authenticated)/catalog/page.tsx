@@ -15,12 +15,12 @@ import { api, type CatalogProduct } from "@/lib/api";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 
 type Toast = { type: "success" | "error"; message: string } | null;
-type StatusFilter = "all" | "active" | "draft" | "archived";
+type StatusFilter = "all" | "active" | "draft";
 
 export default function CatalogPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [busy, setBusy] = useState(true);
-  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [selected, setSelected] = useState<CatalogProduct | null>(null);
   const [search, setSearch] = useState("");
@@ -47,20 +47,19 @@ export default function CatalogPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
-  async function handleArchive() {
+  async function handleDelete() {
     if (!selected) return;
-    setArchiving(true);
+    setDeleting(true);
     try {
-      await api.archiveCatalogProduct(selected.id);
-      setProducts((ps) =>
-        ps.map((p) => (p.id === selected.id ? { ...p, status: "archived" } : p))
-      );
+      await api.deleteCatalogProduct(selected.id);
+      // Remove from local list so it disappears immediately.
+      setProducts((ps) => ps.filter((p) => p.id !== selected.id));
       setSelected(null);
-      showToast({ type: "success", message: "Product archived." });
+      showToast({ type: "success", message: "Product deleted." });
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
-      setArchiving(false);
+      setDeleting(false);
     }
   }
 
@@ -81,9 +80,8 @@ export default function CatalogPage() {
   const summary = useMemo(() => {
     const active = products.filter((p) => p.status === "active").length;
     const draft = products.filter((p) => p.status === "draft").length;
-    const archived = products.filter((p) => p.status === "archived").length;
     const skus = products.reduce((acc, p) => acc + p.variants.length, 0);
-    return { total: products.length, active, draft, archived, skus };
+    return { total: products.length, active, draft, skus };
   }, [products]);
 
   return (
@@ -105,10 +103,9 @@ export default function CatalogPage() {
         </button>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="mb-5 grid grid-cols-3 gap-3">
         <SummaryCard label="Products" value={summary.total} />
         <SummaryCard label="Active" value={summary.active} tone="emerald" />
-        <SummaryCard label="Archived" value={summary.archived} tone="muted" />
         <SummaryCard label="SKUs" value={summary.skus} />
       </div>
 
@@ -123,7 +120,7 @@ export default function CatalogPage() {
           />
         </div>
         <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.02] border border-border/[0.06]">
-          {(["all", "active", "draft", "archived"] as StatusFilter[]).map((s) => (
+          {(["all", "active", "draft"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -181,8 +178,8 @@ export default function CatalogPage() {
       {selected && (
         <ProductDetailModal
           product={selected}
-          busy={archiving}
-          onArchive={handleArchive}
+          busy={deleting}
+          onDelete={handleDelete}
           onClose={() => setSelected(null)}
         />
       )}

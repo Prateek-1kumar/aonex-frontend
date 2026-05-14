@@ -288,7 +288,7 @@ export const api = {
   getTaskEvidence(taskId: string): Promise<TaskEvidence> {
     return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
-  archiveCatalogProduct(id: string): Promise<{ id: string; status: string }> {
+  deleteCatalogProduct(id: string): Promise<{ id: string; status: string }> {
     return request<{ id: string; status: string }>(
       `/api/catalog/products/${encodeURIComponent(id)}`,
       { method: "DELETE" }

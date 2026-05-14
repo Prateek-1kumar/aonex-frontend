@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
-  Archive,
+  Trash2,
   Copy,
   Check,
   ExternalLink,
@@ -18,17 +18,17 @@ import type { CatalogProduct } from "@/lib/api";
 interface Props {
   product: CatalogProduct;
   onClose: () => void;
-  onArchive: () => Promise<void>;
+  onDelete: () => Promise<void>;
   busy?: boolean;
 }
 
-export function ProductDetailModal({ product, onClose, onArchive, busy }: Props) {
+export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) {
   const v = product.current_version;
   const images = v?.images ?? [];
   const [imageIdx, setImageIdx] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [showJson, setShowJson] = useState(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -297,38 +297,36 @@ export function ProductDetailModal({ product, onClose, onArchive, busy }: Props)
               {showJson ? "Hide JSON" : "Raw JSON"}
             </button>
           </div>
-          {product.status !== "archived" && (
-            <div className="flex items-center gap-2">
-              {confirmArchive ? (
-                <>
-                  <button
-                    onClick={() => setConfirmArchive(false)}
-                    disabled={busy}
-                    className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground/80 disabled:opacity-40"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => void onArchive()}
-                    disabled={busy}
-                    className="px-3 py-1.5 rounded-md bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-semibold hover:bg-red-500/25 disabled:opacity-40 flex items-center gap-1.5"
-                  >
-                    <Archive size={12} />
-                    Confirm archive
-                  </button>
-                </>
-              ) : (
+          <div className="flex items-center gap-2">
+            {confirmDelete ? (
+              <>
                 <button
-                  onClick={() => setConfirmArchive(true)}
+                  onClick={() => setConfirmDelete(false)}
                   disabled={busy}
-                  className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-red-400/80 text-xs font-semibold hover:bg-red-500/10 disabled:opacity-40 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground/80 disabled:opacity-40"
                 >
-                  <Archive size={12} />
-                  Archive
+                  Cancel
                 </button>
-              )}
-            </div>
-          )}
+                <button
+                  onClick={() => void onDelete()}
+                  disabled={busy}
+                  className="px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-semibold hover:bg-red-500/30 disabled:opacity-40 flex items-center gap-1.5"
+                >
+                  <Trash2 size={12} />
+                  Confirm delete
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-red-400/80 text-xs font-semibold hover:bg-red-500/10 disabled:opacity-40 flex items-center gap-1.5"
+              >
+                <Trash2 size={12} />
+                Delete
+              </button>
+            )}
+          </div>
         </div>
 
         {showJson && (
