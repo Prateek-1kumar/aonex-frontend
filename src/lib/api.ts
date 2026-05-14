@@ -51,6 +51,19 @@ export interface ReviewTask {
   } | null;
 }
 
+export interface CatalogVariant {
+  id: string;
+  variantId: string;
+  productVersionId: string;
+  sku: string | null;
+  barcode: string | null;
+  price: string | null;
+  currency: string | null;
+  inventoryQuantity: string | null;
+  variantAxes: Record<string, string>;
+  createdAt: string;
+}
+
 export interface CatalogProduct {
   id: string;
   status: string;
@@ -68,8 +81,9 @@ export interface CatalogProduct {
     description: string | null;
     confidenceScore: string;
     merchantExtensionsJson?: Record<string, unknown>;
+    createdAt?: string;
   } | null;
-  variants: Array<Record<string, unknown>>;
+  variants: CatalogVariant[];
 }
 
 function getToken(): string | null {
@@ -273,6 +287,12 @@ export const api = {
   },
   getTaskEvidence(taskId: string): Promise<TaskEvidence> {
     return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
+  },
+  archiveCatalogProduct(id: string): Promise<{ id: string; status: string }> {
+    return request<{ id: string; status: string }>(
+      `/api/catalog/products/${encodeURIComponent(id)}`,
+      { method: "DELETE" }
+    );
   },
   listCatalogProducts() {
     return request<{ products: CatalogProduct[] }>("/api/catalog/products");
