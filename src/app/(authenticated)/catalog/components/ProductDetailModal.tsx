@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Archive,
@@ -28,8 +29,10 @@ export function ProductDetailModal({ product, onClose, onArchive, busy }: Props)
   const [copied, setCopied] = useState<string | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -67,9 +70,11 @@ export function ProductDetailModal({ product, onClose, onArchive, busy }: Props)
     new Set(product.variants.flatMap((vt) => Object.keys(vt.variantAxes ?? {})))
   );
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
     >
       <div
@@ -334,7 +339,8 @@ export function ProductDetailModal({ product, onClose, onArchive, busy }: Props)
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

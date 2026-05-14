@@ -9,6 +9,7 @@ import {
   Search,
   Tag,
   ImageOff,
+  ChevronRight,
 } from "lucide-react";
 import { api, type CatalogProduct } from "@/lib/api";
 import { ProductDetailModal } from "./components/ProductDetailModal";
@@ -165,9 +166,14 @@ export default function CatalogPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} onClick={() => setSelected(product)} />
+        <div className="rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+          {filtered.map((product, idx) => (
+            <ProductRow
+              key={product.id}
+              product={product}
+              first={idx === 0}
+              onClick={() => setSelected(product)}
+            />
           ))}
         </div>
       )}
@@ -195,7 +201,15 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function ProductCard({ product, onClick }: { product: CatalogProduct; onClick: () => void }) {
+function ProductRow({
+  product,
+  first,
+  onClick,
+}: {
+  product: CatalogProduct;
+  first: boolean;
+  onClick: () => void;
+}) {
   const v = product.current_version;
   const confidence = v ? Number(v.confidenceScore) * 100 : 0;
   const price =
@@ -218,45 +232,62 @@ function ProductCard({ product, onClick }: { product: CatalogProduct; onClick: (
   return (
     <button
       onClick={onClick}
-      className="text-left rounded-xl border border-border/[0.07] bg-card hover:border-border/[0.15] hover:bg-white/[0.02] transition-all duration-150 overflow-hidden group focus:outline-none focus:border-primary/30"
+      className={[
+        "w-full text-left grid grid-cols-[64px_minmax(0,1fr)_auto_auto_18px] gap-5 px-5 py-4 items-center group hover:bg-white/[0.02] transition-colors focus:outline-none focus:bg-white/[0.03]",
+        first ? "" : "border-t border-border/[0.06]",
+      ].join(" ")}
     >
-      <div className="aspect-[16/10] bg-white/[0.04] border-b border-border/[0.06] overflow-hidden flex items-center justify-center relative">
+      <div className="size-16 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
         {v?.images?.[0]?.url ? (
-          <img
-            src={v.images[0].url}
-            alt={v.title}
-            className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-          />
+          <img src={v.images[0].url} alt={v.title} className="h-full w-full object-cover" />
         ) : (
-          <ImageOff size={28} className="text-muted-foreground/40" strokeWidth={1.2} />
+          <ImageOff size={20} className="text-muted-foreground/40" strokeWidth={1.2} />
         )}
-        <span
-          className={`absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border backdrop-blur-sm ${statusTone}`}
-        >
-          {product.status}
-        </span>
       </div>
-      <div className="p-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50 truncate">
+
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-foreground/95 truncate">
+            {v?.title ?? "Untitled product"}
+          </p>
+          <span
+            className={`shrink-0 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider border ${statusTone}`}
+          >
+            {product.status}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground/65 truncate">
           {[v?.brand, product.canonicalCategory].filter(Boolean).join(" · ") || "Canonical product"}
         </p>
-        <h3 className="mt-1 text-sm font-semibold text-foreground/95 leading-snug line-clamp-2 min-h-[2.5rem]">
-          {v?.title ?? "Untitled product"}
-        </h3>
-        <div className="mt-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-base font-bold tabular-nums text-foreground/90">{price ?? "—"}</p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-              <Tag size={11} />
-              {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className={`text-xs font-bold tabular-nums ${confTone}`}>{confidence.toFixed(0)}%</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40">confidence</p>
-          </div>
+        <div className="mt-1.5 flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground/45">
+          <span>v{v?.id?.slice(0, 8) ?? "draft"}</span>
+          <span className="flex items-center gap-1">
+            <Tag size={10} />
+            {product.variants.length} SKU{product.variants.length === 1 ? "" : "s"}
+          </span>
+          {v?.gtin && <span className="font-mono normal-case tracking-normal">GTIN {v.gtin}</span>}
         </div>
       </div>
+
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold tabular-nums text-foreground/90">{price ?? "—"}</p>
+        <p className={`mt-0.5 text-[10px] font-bold tabular-nums ${confTone}`}>
+          {confidence.toFixed(0)}% confident
+        </p>
+      </div>
+
+      <div className="text-right shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/45 hidden md:block">
+        Updated
+        <br />
+        <span className="text-muted-foreground/65 normal-case tracking-normal">
+          {new Date(product.updatedAt).toLocaleDateString()}
+        </span>
+      </div>
+
+      <ChevronRight
+        size={16}
+        className="text-muted-foreground/35 group-hover:text-foreground/70 transition-colors"
+      />
     </button>
   );
 }
