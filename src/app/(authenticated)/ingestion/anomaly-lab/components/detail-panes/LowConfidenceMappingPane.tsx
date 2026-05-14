@@ -52,11 +52,16 @@ export function LowConfidenceMappingPane({
           onClick={async () => {
             setBusy(true);
             try {
-              await api.editAndApprove(task.id, {
+              // Only send newNormalizedValue when the reviewer actually typed
+              // something. Sending undefined here used to silently blank the
+              // existing field (e.g. title) during serialization on the server.
+              const trimmed = newValue.trim();
+              const payload: Parameters<typeof api.editAndApprove>[1] = {
                 fieldName: task.fieldName!,
                 newCanonicalPath: newPath || null,
-                newNormalizedValue: newValue || (task.signalPayload.evidence as Record<string, unknown>).value,
-              });
+                newNormalizedValue: trimmed ? trimmed : null,
+              };
+              await api.editAndApprove(task.id, payload);
               onResolved();
             } catch (e) {
               onError((e as Error).message);
