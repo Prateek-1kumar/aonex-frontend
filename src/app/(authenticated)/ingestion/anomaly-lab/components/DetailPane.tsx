@@ -9,6 +9,7 @@ import { CategoryAmbiguousPane } from "./detail-panes/CategoryAmbiguousPane";
 import { PotentialDuplicatePane } from "./detail-panes/PotentialDuplicatePane";
 import { VariantIncompletePane } from "./detail-panes/VariantIncompletePane";
 import { PriceAnomalyPane } from "./detail-panes/PriceAnomalyPane";
+import { FailurePane } from "./detail-panes/FailurePane";
 
 export interface DetailPaneProps {
   mode: "cluster" | "single";
@@ -126,6 +127,11 @@ function PerSignalPane(props: {
       return <VariantIncompletePane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
     case "price_anomaly":
       return <PriceAnomalyPane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
+    case "fetch_failed":
+    case "captcha_wall":
+    case "no_data_extracted":
+    case "artifact_duplicate":
+      return <FailurePane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
     default:
       return <p className="text-sm text-muted-foreground">Unknown signal kind.</p>;
   }

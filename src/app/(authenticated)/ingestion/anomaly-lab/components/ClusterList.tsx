@@ -16,6 +16,10 @@ const SIGNAL_LABEL: Record<string, string> = {
   category_ambiguous: "Category amb",
   variant_incomplete: "Variant incomplete",
   price_anomaly: "Price anomaly",
+  fetch_failed: "Fetch blocked",
+  captcha_wall: "Captcha wall",
+  no_data_extracted: "No data extracted",
+  artifact_duplicate: "Duplicate URL",
 };
 
 export function ClusterList({
