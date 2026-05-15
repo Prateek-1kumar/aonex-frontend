@@ -6,7 +6,11 @@ export type SignalKind =
   | "potential_duplicate"
   | "category_ambiguous"
   | "variant_incomplete"
-  | "price_anomaly";
+  | "price_anomaly"
+  | "fetch_failed"
+  | "captcha_wall"
+  | "no_data_extracted"
+  | "artifact_duplicate";
 
 export type Severity = "low" | "medium" | "high" | "critical";
 
