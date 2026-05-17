@@ -7,6 +7,7 @@ export type SignalKind =
   | "category_ambiguous"
   | "variant_incomplete"
   | "price_anomaly"
+  | "value_conflict"           // ← Phase 9 — multi-source reconciler
   | "fetch_failed"
   | "captcha_wall"
   | "no_data_extracted"

@@ -17,6 +17,7 @@ import { getDisplayPrice } from "./lib/price";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 type StatusFilter = "all" | "active" | "draft";
+type SourceLaneFilter = "all" | "link" | "csv" | "marketplace";
 
 export default function CatalogPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -26,6 +27,7 @@ export default function CatalogPage() {
   const [selected, setSelected] = useState<CatalogProduct | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sourceLane, setSourceLane] = useState<SourceLaneFilter>("all");
 
   useEffect(() => {
     void loadProducts();
@@ -135,6 +137,28 @@ export default function CatalogPage() {
               {s}
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.02] border border-border/[0.06]">
+          {(["all", "link", "csv", "marketplace"] as SourceLaneFilter[]).map((s) => {
+            const disabled = s !== "all" && s !== "link";
+            return (
+              <button
+                key={s}
+                onClick={() => !disabled && setSourceLane(s)}
+                disabled={disabled}
+                className={[
+                  "px-2.5 py-1 rounded-md text-[11px] font-semibold uppercase tracking-wider",
+                  sourceLane === s
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground/60 hover:text-foreground/80",
+                  disabled && "opacity-40 cursor-not-allowed"
+                ].filter(Boolean).join(" ")}
+                title={disabled ? "Requires Phase 4 (CSV) or Phase 5 (Marketplace) lane wiring" : undefined}
+              >
+                {s}
+              </button>
+            );
+          })}
         </div>
       </div>
 
