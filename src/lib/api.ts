@@ -164,6 +164,10 @@ export interface ProductProvenance {
   version_id: string | null;
   category_path: string | null;
   category_schema_version: string | null;
+  /** Phase 3 schema tier. Null when category_path doesn't match a seeded schema. */
+  category_tier: "authoritative" | "inferred" | "promoted_draft" | null;
+  /** Distinct source lanes that contributed facts to this product. */
+  source_types: Array<"link_url" | "templated_csv" | "marketplace_connector">;
   fields: ProvenanceField[];
 }
 
