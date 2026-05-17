@@ -86,6 +86,87 @@ export interface CatalogProduct {
   variants: CatalogVariant[];
 }
 
+// ─── Phase 6/8/9 — link ingestion pack ────────────────────────────
+
+export interface RecentIngestion {
+  artifact_id: string;
+  source_external_id: string;
+  status: "pending" | "processing" | "completed" | "failed" | "needs_review";
+  received_at: string;
+  checksum: string;
+  /** "static" | "browser" | "unblock" — Phase 6 escalation tier */
+  escalated_to: "static" | "browser" | "unblock" | null;
+  escalation_reasons: string[];
+  cost_credits: number;
+  final_url: string;
+  fact_count: number;
+  extractor_version: string | null;
+}
+
+export interface IngestionTraceEvent {
+  id: string;
+  event_type: string;
+  /** Phase 2 spine stage: persist_artifact | extract | map | validate | score | diff | approve */
+  stage: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface IngestionTrace {
+  artifact: {
+    id: string;
+    source_external_id: string;
+    status: string;
+    received_at: string;
+    processing_errors: Array<Record<string, unknown>>;
+  };
+  events: IngestionTraceEvent[];
+}
+
+export type ProvenanceRung =
+  | "json_ld"
+  | "opengraph"
+  | "nuxt"
+  | "next_data"
+  | "initial_state"
+  | "shopify_probe"
+  | "shopify_products_json"
+  | "magento"
+  | "woocommerce"
+  | "algolia"
+  | "rdfa"
+  | "breadcrumb_list"
+  | "microdata"
+  | "dom_heuristic"
+  | "vision_llm"
+  | "llm_gap_fill"
+  | `per_site_parser:${string}`
+  | "direct"
+  | "computed"
+  | "inferred";
+
+export interface ProvenanceField {
+  canonical_path: string | null;
+  raw_key: string;
+  extracted_value: unknown;
+  normalized_value: unknown;
+  source_pointer: string;
+  extraction_method: string;
+  rung: ProvenanceRung;
+  confidence: number;
+  mapping_method: string | null;
+  extractor_version: string;
+  mapper_version: string;
+}
+
+export interface ProductProvenance {
+  product_id: string;
+  version_id: string | null;
+  category_path: string | null;
+  category_schema_version: string | null;
+  fields: ProvenanceField[];
+}
+
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(^| )aonex_token=([^;]+)`));
@@ -296,5 +377,14 @@ export const api = {
   },
   listCatalogProducts() {
     return request<{ products: CatalogProduct[] }>("/api/catalog/products");
+  },
+  listRecentIngestions(limit = 20): Promise<{ ingestions: RecentIngestion[] }> {
+    return request<{ ingestions: RecentIngestion[] }>(`/api/ingestions/recent?limit=${limit}`);
+  },
+  getIngestionTrace(artifactId: string): Promise<IngestionTrace> {
+    return request<IngestionTrace>(`/api/ingestions/${encodeURIComponent(artifactId)}/trace`);
+  },
+  getProductProvenance(productId: string): Promise<ProductProvenance> {
+    return request<ProductProvenance>(`/api/catalog/products/${encodeURIComponent(productId)}/provenance`);
   },
 };
