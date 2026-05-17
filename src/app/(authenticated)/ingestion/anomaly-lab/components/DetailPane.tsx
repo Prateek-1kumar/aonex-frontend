@@ -7,6 +7,7 @@ import { MissingAttributePane } from "./detail-panes/MissingAttributePane";
 import { UnitConflictPane } from "./detail-panes/UnitConflictPane";
 import { CategoryAmbiguousPane } from "./detail-panes/CategoryAmbiguousPane";
 import { PotentialDuplicatePane } from "./detail-panes/PotentialDuplicatePane";
+import { ValueConflictPane } from "./detail-panes/ValueConflictPane";
 import { VariantIncompletePane } from "./detail-panes/VariantIncompletePane";
 import { PriceAnomalyPane } from "./detail-panes/PriceAnomalyPane";
 import { FailurePane } from "./detail-panes/FailurePane";
@@ -119,6 +120,8 @@ function PerSignalPane(props: {
       return <MissingAttributePane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
     case "unit_conflict":
       return <UnitConflictPane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
+    case "value_conflict":
+      return <ValueConflictPane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
     case "category_ambiguous":
       return <CategoryAmbiguousPane task={props.selectedTask} onResolved={props.onTaskResolved} onError={props.onError} />;
     case "potential_duplicate":

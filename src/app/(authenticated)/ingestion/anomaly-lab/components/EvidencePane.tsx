@@ -1,12 +1,48 @@
-import type { TaskEvidence } from "../types";
+import type { SignalKind, TaskEvidence } from "../types";
 import { HtmlSnippetIframe } from "./evidence/HtmlSnippetIframe";
+
+const SIGNAL_CHIP_TONE: Partial<Record<SignalKind, string>> = {
+  value_conflict: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+  potential_duplicate: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+  fetch_failed: "bg-red-500/15 text-red-300 border-red-500/20",
+  captcha_wall: "bg-red-500/15 text-red-300 border-red-500/20",
+  no_data_extracted: "bg-red-500/15 text-red-300 border-red-500/20",
+  artifact_duplicate: "bg-red-500/15 text-red-300 border-red-500/20",
+};
+
+const DEFAULT_CHIP_TONE = "bg-primary/15 text-primary border-primary/20";
+
+const SIGNAL_CHIP_LABEL: Partial<Record<SignalKind, string>> = {
+  value_conflict: "Value conflict",
+  potential_duplicate: "Potential dup",
+  field_conflict: "Field conflict",
+  unit_conflict: "Unit conflict",
+  low_confidence_mapping: "Low confidence",
+  missing_required_attribute: "Missing attr",
+  category_ambiguous: "Category amb",
+  variant_incomplete: "Variant incomplete",
+  price_anomaly: "Price anomaly",
+  fetch_failed: "Fetch failed",
+  captcha_wall: "Captcha wall",
+  no_data_extracted: "No data",
+  artifact_duplicate: "Duplicate URL",
+};
 
 export function EvidencePane({ evidence }: { evidence: TaskEvidence | null }) {
   return (
     <div className="rounded-xl border border-border/[0.08] bg-card p-5 h-full overflow-y-auto">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3">
-        Evidence
-      </p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+          Evidence
+        </p>
+        {evidence && (
+          <span
+            className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${SIGNAL_CHIP_TONE[evidence.signalKind] ?? DEFAULT_CHIP_TONE}`}
+          >
+            {SIGNAL_CHIP_LABEL[evidence.signalKind] ?? evidence.signalKind}
+          </span>
+        )}
+      </div>
       {!evidence ? (
         <p className="text-xs text-muted-foreground">Select a task to inspect evidence.</p>
       ) : (

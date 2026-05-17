@@ -12,6 +12,7 @@ const SIGNAL_LABEL: Record<string, string> = {
   missing_required_attribute: "Missing attr",
   field_conflict: "Field conflict",
   unit_conflict: "Unit conflict",
+  value_conflict: "Value conflict",
   potential_duplicate: "Potential dup",
   category_ambiguous: "Category amb",
   variant_incomplete: "Variant incomplete",
