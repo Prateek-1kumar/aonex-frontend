@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, CheckCircle2, AlertCircle, Loader2, Clock } from "lucide-react";
 import { api, type IngestionTrace } from "@/lib/api";
+import { ExtractedSku } from "./ExtractedSku";
 
 interface Props {
   artifactId: string;
@@ -99,6 +100,8 @@ export function TraceModal({ artifactId, onClose }: Props) {
               {error}
             </div>
           )}
+
+          {trace && <ExtractedSku sku={trace.sku ?? null} />}
 
           {trace && (
             <>
