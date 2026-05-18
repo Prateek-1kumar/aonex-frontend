@@ -461,4 +461,9 @@ export const api = {
   getProductProvenance(productId: string): Promise<ProductProvenance> {
     return request<ProductProvenance>(`/api/catalog/products/${encodeURIComponent(productId)}/provenance`);
   },
+  getCatalogProductSku(productId: string): Promise<{ sku: SkuJson | null }> {
+    return request<{ sku: SkuJson | null }>(
+      `/api/catalog/products/${encodeURIComponent(productId)}/sku`
+    );
+  },
 };

@@ -1,25 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
   Trash2,
   Copy,
   Check,
-  ExternalLink,
+  Code,
   Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
-  Tag,
-  Layers,
-  Sparkles,
-  Globe,
-  FileSpreadsheet,
-  Plug,
+  ChevronDown,
+  ChevronUp,
+  Star,
+  AlertTriangle,
 } from "lucide-react";
-import { api, type CatalogProduct, type ProductProvenance, type ProvenanceRung } from "@/lib/api";
-import { getDisplayPrice } from "../lib/price";
+import {
+  api,
+  type CatalogProduct,
+  type ProductProvenance,
+  type ProvenanceRung,
+  type SkuJson,
+  type SkuSourceTag,
+} from "@/lib/api";
 
 interface Props {
   product: CatalogProduct;
@@ -28,21 +32,25 @@ interface Props {
   busy?: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) {
   const v = product.current_version;
-  const images = v?.images ?? [];
   const [imageIdx, setImageIdx] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [sku, setSku] = useState<SkuJson | null>(null);
+  const [skuLoading, setSkuLoading] = useState(true);
+  const [skuError, setSkuError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     document.body.style.overflow = "hidden";
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onEsc);
     return () => {
       document.body.style.overflow = "";
@@ -50,17 +58,59 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
     };
   }, [onClose]);
 
-  function copy(label: string, value: string) {
-    navigator.clipboard.writeText(value).then(() => {
-      setCopied(label);
-      setTimeout(() => setCopied(null), 1500);
-    });
-  }
+  useEffect(() => {
+    setSkuLoading(true);
+    api
+      .getCatalogProductSku(product.id)
+      .then((r) => setSku(r.sku))
+      .catch((e) => setSkuError((e as Error).message))
+      .finally(() => setSkuLoading(false));
+  }, [product.id]);
+
+  // SkuJson is the primary source of truth. The thin canonical row is only used
+  // for IDs, status, and as a last-resort fallback when SkuJson fails to rebuild.
+  const title = sku?.title ?? v?.title ?? "Untitled product";
+  const brand = sku?.brand ?? v?.brand ?? null;
+  const gtin = sku?.gtin ?? v?.gtin ?? null;
+  const mpn = sku?.mpn ?? null;
+  const modelNumber = sku?.model_number ?? v?.modelNumber ?? null;
+  const internalSku = sku?.sku ?? null;
+  const category = sku?.category_path ?? product.canonicalCategory ?? null;
+  const descShort = sku?.description_short ?? null;
+  const descLong = sku?.description_long ?? v?.description ?? null;
+  const breadcrumbs = sku?.breadcrumbs ?? [];
+  const highlights = sku?.highlights ?? [];
+  const ratings = sku?.ratings ?? null;
+  const seller = sku?.seller ?? null;
+  const pricing = sku?.pricing ?? null;
+  const shipping = sku?.shipping ?? null;
+  const warranty = sku?.warranty ?? null;
+  const returnPolicy = sku?.return_policy ?? null;
+  const attributes = sku?.attributes ?? {};
+  const variants = sku?.variants ?? [];
+  const meta = sku?._extraction_meta ?? null;
+  const fieldSource = sku?._field_source ?? {};
+  const fieldConfidence = sku?._field_confidence ?? {};
+  const validationWarnings = meta?.validation_warnings ?? [];
+
+  const images = useMemo(() => {
+    if (sku?.images && sku.images.length > 0) {
+      // Order: hero first, then by position.
+      const sorted = [...sku.images].sort((a, b) => {
+        if (a.role === "hero" && b.role !== "hero") return -1;
+        if (b.role === "hero" && a.role !== "hero") return 1;
+        return (a.position ?? 0) - (b.position ?? 0);
+      });
+      return sorted.map((i) => ({
+        url: i.url,
+        altText: i.alt_text ?? undefined,
+        role: i.role,
+      }));
+    }
+    return (v?.images ?? []).map((i) => ({ ...i, role: undefined as undefined }));
+  }, [sku, v]);
 
   const confidence = v ? Number(v.confidenceScore) * 100 : 0;
-  const displayPrice = getDisplayPrice(product);
-  const priceText = displayPrice?.text ?? "—";
-  const priceLabel = displayPrice?.isRange ? "Price range" : "Price";
 
   const statusTone =
     product.status === "archived"
@@ -69,9 +119,12 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
         ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
         : "bg-amber-500/10 text-amber-300 border-amber-500/20";
 
-  const axisKeys = Array.from(
-    new Set(product.variants.flatMap((vt) => Object.keys(vt.variantAxes ?? {})))
-  );
+  function copy(label: string, value: string) {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }
 
   if (!mounted) return null;
 
@@ -81,20 +134,30 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
+        className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur">
+        {/* ── Sticky header ────────────────────────────────────────────── */}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-3.5 border-b border-border/[0.06] bg-card/95 backdrop-blur">
           <div className="flex items-center gap-3 min-w-0">
             <span
               className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusTone}`}
             >
               {product.status}
             </span>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 truncate">
-              Catalog · {v?.id?.slice(0, 8) ?? "—"}
-            </p>
+            {category && (
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70 truncate">
+                {category}
+              </span>
+            )}
+            <span className="text-[10px] font-mono text-muted-foreground/50 truncate">
+              {product.id.slice(0, 8)}
+            </span>
+            {skuLoading && (
+              <span className="text-[10px] font-mono text-muted-foreground/50 animate-pulse">
+                rebuilding…
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -105,28 +168,38 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8 p-6">
-          {/* Image column */}
+        {/* ── Body grid (image | detail) ───────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 p-6">
+          {/* ─── Image column ─── */}
           <div>
-            <div className="aspect-square rounded-xl bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center">
+            <div className="aspect-square rounded-xl bg-white/[0.03] border border-border/[0.06] overflow-hidden flex items-center justify-center relative">
               {images[imageIdx]?.url ? (
                 <img
                   src={images[imageIdx]!.url}
-                  alt={v?.title ?? ""}
+                  alt={images[imageIdx]?.altText ?? title}
                   className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
                 />
               ) : (
-                <div className="text-center text-muted-foreground/50">
-                  <ImageIcon size={40} strokeWidth={1.2} />
-                  <p className="mt-2 text-xs uppercase tracking-wider">No image</p>
+                <div className="text-center text-muted-foreground/40">
+                  <ImageIcon size={36} strokeWidth={1.2} />
+                  <p className="mt-2 text-[10px] uppercase tracking-wider">No image</p>
                 </div>
               )}
+              {images[imageIdx]?.role && (
+                <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-foreground/80 border border-white/10">
+                  {images[imageIdx]!.role}
+                </span>
+              )}
             </div>
+
             {images.length > 1 && (
               <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => setImageIdx((i) => (i - 1 + images.length) % images.length)}
-                  className="size-7 rounded-md bg-white/[0.04] border border-border/[0.08] hover:bg-white/[0.07] flex items-center justify-center"
+                  className="size-7 rounded-md bg-white/[0.04] border border-border/[0.08] hover:bg-white/[0.07] flex items-center justify-center shrink-0"
                   aria-label="Previous image"
                 >
                   <ChevronLeft size={14} />
@@ -137,170 +210,329 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
                       key={i}
                       onClick={() => setImageIdx(i)}
                       className={`size-12 rounded-md overflow-hidden border-2 shrink-0 ${
-                        i === imageIdx ? "border-primary/70" : "border-border/[0.06] opacity-60 hover:opacity-100"
+                        i === imageIdx
+                          ? "border-primary/70"
+                          : "border-border/[0.06] opacity-60 hover:opacity-100"
                       }`}
                     >
-                      <img src={img.url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={img.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
                     </button>
                   ))}
                 </div>
                 <button
                   onClick={() => setImageIdx((i) => (i + 1) % images.length)}
-                  className="size-7 rounded-md bg-white/[0.04] border border-border/[0.08] hover:bg-white/[0.07] flex items-center justify-center"
+                  className="size-7 rounded-md bg-white/[0.04] border border-border/[0.08] hover:bg-white/[0.07] flex items-center justify-center shrink-0"
                   aria-label="Next image"
                 >
                   <ChevronRight size={14} />
                 </button>
               </div>
             )}
+
+            <p className="mt-2 text-[10px] text-muted-foreground/40 text-center tabular-nums">
+              {imageIdx + 1} / {images.length || 1}
+            </p>
           </div>
 
-          {/* Detail column */}
+          {/* ─── Detail column ─── */}
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
-              {[v?.brand, product.canonicalCategory].filter(Boolean).join(" · ") || "Canonical product"}
-            </p>
-            <h2 className="mt-1.5 font-serif text-2xl font-bold text-foreground/95 leading-tight">
-              {v?.title ?? "Untitled product"}
-            </h2>
+            {/* Breadcrumbs */}
+            {breadcrumbs.length > 0 && (
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50 mb-1.5 truncate">
+                {breadcrumbs.join(" › ")}
+              </p>
+            )}
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <Stat label={priceLabel} value={priceText} />
+            {/* Title row */}
+            <div className="flex items-start gap-2 flex-wrap">
+              <h2 className="font-serif text-2xl font-bold text-foreground/95 leading-tight flex-1 min-w-0">
+                {title}
+              </h2>
+              <SourcePill source={fieldSource.title} field="title" confidences={fieldConfidence} />
+            </div>
+
+            {/* Brand · GTIN · MPN · Model · SKU */}
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
+              {brand && (
+                <Meta label="Brand" value={brand} source={fieldSource.brand} field="brand" confidences={fieldConfidence} />
+              )}
+              {gtin && (
+                <MetaMono label="GTIN" value={gtin} onCopy={() => copy("GTIN", gtin)} copied={copied === "GTIN"} source={fieldSource.gtin} field="gtin" confidences={fieldConfidence} />
+              )}
+              {modelNumber && (
+                <MetaMono label="Model" value={modelNumber} onCopy={() => copy("Model", modelNumber)} copied={copied === "Model"} source={fieldSource.model_number} field="model_number" confidences={fieldConfidence} />
+              )}
+              {mpn && (
+                <MetaMono label="MPN" value={mpn} onCopy={() => copy("MPN", mpn)} copied={copied === "MPN"} source={fieldSource.mpn} field="mpn" confidences={fieldConfidence} />
+              )}
+              {internalSku && (
+                <MetaMono label="SKU" value={internalSku} onCopy={() => copy("SKU", internalSku)} copied={copied === "SKU"} source={fieldSource.sku} field="sku" confidences={fieldConfidence} />
+              )}
+            </div>
+
+            {/* Pricing + rating + confidence row */}
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <PricingCard pricing={pricing} source={fieldSource.list_price ?? fieldSource.base_price} field="list_price" confidences={fieldConfidence} />
+              <Stat
+                label="Rating"
+                value={
+                  ratings?.average != null
+                    ? `★ ${ratings.average.toFixed(1)}${ratings.count != null ? ` (${ratings.count.toLocaleString()})` : ""}`
+                    : "—"
+                }
+                tone={ratings?.average != null && ratings.average >= 4 ? "emerald" : undefined}
+              />
               <Stat
                 label="Confidence"
                 value={`${confidence.toFixed(0)}%`}
                 tone={confidence >= 90 ? "emerald" : confidence >= 60 ? "amber" : "red"}
               />
-              <Stat
-                label="GTIN"
-                value={v?.gtin ?? "—"}
-                copyable={v?.gtin ? { label: "GTIN", value: v.gtin } : undefined}
-                onCopy={copy}
-                copied={copied}
-              />
-              <Stat
-                label="Model"
-                value={v?.modelNumber ?? "—"}
-                copyable={v?.modelNumber ? { label: "Model", value: v.modelNumber } : undefined}
-                onCopy={copy}
-                copied={copied}
-              />
+              <Stat label="Variants" value={String(variants.length || product.variants.length || 0)} />
             </div>
 
-            {v?.description && (
-              <details className="mt-5 group">
-                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-foreground/80">
-                  Description
-                </summary>
-                <p className="mt-2 text-sm text-foreground/75 leading-relaxed whitespace-pre-line">
-                  {v.description}
-                </p>
-              </details>
+            {/* Seller */}
+            {seller?.name && (
+              <div className="mt-3 flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground/60 uppercase tracking-wider text-[10px] font-bold">
+                  Sold by
+                </span>
+                <span className="text-foreground/90 font-semibold">{seller.name}</span>
+                {seller.is_official && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-sky-500/10 text-sky-300 border border-sky-500/20">
+                    Official
+                  </span>
+                )}
+                <SourcePill source={fieldSource.seller_name} field="seller_name" confidences={fieldConfidence} />
+              </div>
             )}
 
-            {Object.keys(v?.merchantExtensionsJson ?? {}).length > 0 && (
-              <div className="mt-5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-2">
-                  Attributes
-                </p>
-                <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] divide-y divide-border/[0.04]">
-                  {Object.entries(v!.merchantExtensionsJson!).map(([k, val]) => (
-                    <div key={k} className="flex justify-between gap-4 px-3 py-2 text-xs">
-                      <span className="text-muted-foreground/70 font-mono">{k}</span>
-                      <span className="text-foreground/85 text-right truncate">
-                        {typeof val === "object" ? JSON.stringify(val) : String(val)}
-                      </span>
+            {/* Validation warnings */}
+            {validationWarnings.length > 0 && (
+              <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                  {validationWarnings.map((w, i) => (
+                    <div key={i}>
+                      <span className="font-mono text-amber-300">{w.field}</span>{" "}
+                      <span className="text-amber-200/85">— {w.reason}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            <Provenance productId={product.id} />
+            {/* Short description as a callout if present */}
+            {descShort && (
+              <p className="mt-4 text-sm text-foreground/75 leading-relaxed">{descShort}</p>
+            )}
           </div>
         </div>
 
-        {/* Variants */}
-        {product.variants.length > 0 && (
-          <div className="px-6 pb-6">
-            <div className="flex items-baseline justify-between mb-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                <Tag size={12} />
-                Variants
-              </p>
-              <p className="text-[10px] tabular-nums text-muted-foreground/40">
-                {product.variants.length} SKU{product.variants.length === 1 ? "" : "s"}
-              </p>
+        {/* ── Highlights ──────────────────────────────────────────────── */}
+        {highlights.length > 0 && (
+          <Section title="Highlights" count={highlights.length} defaultOpen>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-foreground/80">
+              {highlights.map((h, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-primary/60 shrink-0">•</span>
+                  <span>{h}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {/* ── Description ─────────────────────────────────────────────── */}
+        {descLong && descLong !== descShort && (
+          <Section title="Description">
+            <p className="text-sm text-foreground/75 leading-relaxed whitespace-pre-line">
+              {descLong}
+            </p>
+          </Section>
+        )}
+
+        {/* ── Attributes ──────────────────────────────────────────────── */}
+        {Object.keys(attributes).length > 0 && (
+          <Section title="Attributes" count={Object.keys(attributes).length} defaultOpen>
+            <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] divide-y divide-border/[0.04]">
+              {Object.entries(attributes).map(([k, a]) => (
+                <div
+                  key={k}
+                  className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-xs items-center"
+                >
+                  <span className="text-muted-foreground/75 font-mono">
+                    {k.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-foreground/90 text-right">
+                    {formatAttrValue(a.value)}
+                    {a.unit ? <span className="text-muted-foreground/60"> {a.unit}</span> : null}
+                  </span>
+                  <SourcePill source={a.source} field={k} confidences={fieldConfidence} />
+                </div>
+              ))}
             </div>
+          </Section>
+        )}
+
+        {/* ── Variants ────────────────────────────────────────────────── */}
+        {variants.length > 0 && (
+          <Section title="Variants" count={variants.length} defaultOpen={variants.length <= 6}>
             <div className="rounded-xl border border-border/[0.06] bg-white/[0.02] overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="border-b border-border/[0.06] bg-white/[0.02]">
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60">
-                    {axisKeys.map((k) => (
-                      <th key={k} className="px-3 py-2 font-semibold capitalize">
-                        {k}
-                      </th>
-                    ))}
-                    <th className="px-3 py-2 font-semibold">SKU</th>
-                    <th className="px-3 py-2 font-semibold">Barcode</th>
-                    <th className="px-3 py-2 font-semibold text-right">Price</th>
-                    <th className="px-3 py-2 font-semibold text-right">Stock</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/[0.04]">
-                  {product.variants.map((vt) => (
-                    <tr key={vt.id} className="hover:bg-white/[0.02]">
-                      {axisKeys.map((k) => (
-                        <td key={k} className="px-3 py-2 text-foreground/85">
-                          {vt.variantAxes?.[k] ?? "—"}
-                        </td>
-                      ))}
-                      <td className="px-3 py-2 font-mono text-foreground/70 text-[11px]">
-                        {vt.sku || <span className="text-muted-foreground/40">—</span>}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-muted-foreground/60 text-[11px]">
-                        {vt.barcode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-foreground/85">
-                        {vt.price ? `${vt.currency ?? ""} ${Number(vt.price).toLocaleString()}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
-                        {vt.inventoryQuantity != null ? Number(vt.inventoryQuantity).toLocaleString() : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-[40px_minmax(0,1fr)_auto_auto] gap-3 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-b border-border/[0.06]">
+                <span></span>
+                <span>Options · SKU</span>
+                <span className="text-right">Price</span>
+                <span className="text-right">Barcode</span>
+              </div>
+              <div className="divide-y divide-border/[0.04]">
+                {variants.map((vt, i) => {
+                  const optStr = Object.entries(vt.option_values ?? {})
+                    .map(([k, val]) => `${k}: ${val}`)
+                    .join(" · ");
+                  const price =
+                    vt.pricing?.sale_price ?? vt.pricing?.list_price ?? null;
+                  return (
+                    <div
+                      key={i}
+                      className="grid grid-cols-[40px_minmax(0,1fr)_auto_auto] gap-3 px-3 py-2 text-xs items-center hover:bg-white/[0.02]"
+                    >
+                      <div className="size-10 rounded bg-white/[0.04] overflow-hidden flex items-center justify-center">
+                        {vt.image_urls?.[0] ? (
+                          <img
+                            src={vt.image_urls[0]}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <ImageIcon size={14} className="text-muted-foreground/30" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-foreground/90 truncate">{optStr || "—"}</div>
+                        {vt.sku && (
+                          <div className="font-mono text-[10px] text-muted-foreground/60 truncate">
+                            {vt.sku}
+                          </div>
+                        )}
+                      </div>
+                      <span className="tabular-nums text-foreground/90 text-right whitespace-nowrap">
+                        {price != null
+                          ? formatPrice(price, vt.pricing?.currency ?? pricing?.currency ?? null)
+                          : "—"}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground/55 text-right truncate">
+                        {vt.barcode ?? "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          </Section>
+        )}
+
+        {/* ── Shipping / warranty / returns ────────────────────────────── */}
+        {(shipping?.free_shipping != null ||
+          shipping?.shipping_cost != null ||
+          shipping?.weight ||
+          shipping?.dimensions ||
+          warranty ||
+          returnPolicy) && (
+          <Section title="Logistics & policies">
+            <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+              {shipping?.free_shipping != null && (
+                <DefRow label="Free shipping" value={shipping.free_shipping ? "Yes" : "No"} />
+              )}
+              {shipping?.shipping_cost != null && (
+                <DefRow
+                  label="Shipping cost"
+                  value={formatPrice(shipping.shipping_cost, pricing?.currency ?? null)}
+                />
+              )}
+              {shipping?.weight && (
+                <DefRow
+                  label="Weight"
+                  value={`${shipping.weight.value} ${shipping.weight.unit}`}
+                />
+              )}
+              {shipping?.dimensions && (
+                <DefRow
+                  label="Dimensions"
+                  value={`${shipping.dimensions.length} × ${shipping.dimensions.width} × ${shipping.dimensions.height} ${shipping.dimensions.unit}`}
+                />
+              )}
+              {warranty && <DefRow label="Warranty" value={warranty} />}
+              {returnPolicy && <DefRow label="Return policy" value={returnPolicy} />}
+            </dl>
+          </Section>
+        )}
+
+        {/* ── Provenance ──────────────────────────────────────────────── */}
+        <Provenance productId={product.id} />
+
+        {/* ── Extraction meta footer ──────────────────────────────────── */}
+        {meta && (
+          <div className="px-6 py-3 mx-6 my-4 rounded-lg bg-white/[0.02] border border-border/[0.05] flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-muted-foreground/65">
+            <span className="uppercase tracking-[0.18em] font-bold">Pipeline</span>
+            {(["per_site", "structured", "dom", "llm-gap-fill", "vision"] as const).map((p) => (
+              <span
+                key={p}
+                className={
+                  meta.passes_run.includes(p)
+                    ? "text-foreground/85"
+                    : "text-muted-foreground/25"
+                }
+              >
+                {p}
+              </span>
+            ))}
+            <span className="ml-auto flex items-center gap-3">
+              {meta.tokens_used > 0 && <span>{meta.tokens_used.toLocaleString()} tok</span>}
+              <span>${meta.cost_usd.toFixed(4)}</span>
+              <span>{(meta.latency_ms / 1000).toFixed(1)}s</span>
+              <span className="uppercase">{meta.escalated_to}</span>
+              {meta.budget_exceeded && <span className="text-amber-300">BUDGET</span>}
+            </span>
           </div>
         )}
 
-        {/* Footer actions */}
-        <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 px-6 py-4 border-t border-border/[0.06] bg-card/95 backdrop-blur">
+        {skuError && (
+          <div className="mx-6 mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
+            Failed to rebuild rich SkuJson: {skuError}
+          </div>
+        )}
+
+        {/* ── Sticky footer ────────────────────────────────────────────── */}
+        <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 px-6 py-3 border-t border-border/[0.06] bg-card/95 backdrop-blur">
           <div className="flex items-center gap-2 flex-wrap">
-            <button
+            <FooterBtn
               onClick={() => copy("Product ID", product.id)}
-              className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-xs text-foreground/70 hover:bg-white/[0.07] flex items-center gap-1.5"
-            >
-              {copied === "Product ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-              Product ID
-            </button>
+              icon={copied === "Product ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              label="Product ID"
+            />
             {v?.id && (
-              <button
+              <FooterBtn
                 onClick={() => copy("Version ID", v.id)}
-                className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-xs text-foreground/70 hover:bg-white/[0.07] flex items-center gap-1.5"
-              >
-                {copied === "Version ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                Version ID
-              </button>
+                icon={copied === "Version ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                label="Version ID"
+              />
             )}
-            <button
+            <FooterBtn
               onClick={() => setShowJson((s) => !s)}
-              className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-xs text-foreground/70 hover:bg-white/[0.07] flex items-center gap-1.5"
-            >
-              <ExternalLink size={12} />
-              {showJson ? "Hide JSON" : "Raw JSON"}
-            </button>
+              icon={<Code size={12} />}
+              label={showJson ? "Hide JSON" : "SkuJson"}
+              active={showJson}
+            />
           </div>
           <div className="flex items-center gap-2">
             {confirmDelete ? (
@@ -334,10 +566,18 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
           </div>
         </div>
 
+        {/* ── Raw SkuJson dump ─────────────────────────────────────────── */}
         {showJson && (
           <div className="px-6 pb-6">
-            <pre className="text-[10px] leading-tight bg-black/30 rounded-lg p-3 overflow-x-auto max-h-72 text-foreground/70 border border-border/[0.06]">
-{JSON.stringify(product, null, 2)}
+            <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-emerald-300/80">
+              SkuJson · rebuilt on-demand from extractedFacts
+            </p>
+            <pre className="text-[10px] leading-tight bg-black/30 rounded-lg p-3 overflow-x-auto max-h-[28rem] text-foreground/70 border border-border/[0.06]">
+{sku
+  ? JSON.stringify(sku, null, 2)
+  : skuLoading
+    ? "// Loading rich extraction…"
+    : "// No rich extraction available"}
             </pre>
           </div>
         )}
@@ -347,42 +587,329 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Source pill (per-field provenance)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<SkuSourceTag, string> = {
+  structured: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "per-site": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  dom: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  "llm-text": "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  "llm-hints": "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  "llm-link": "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  vision: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  enrichment: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+};
+
+function SourcePill({
+  source,
+  field,
+  confidences,
+}: {
+  source: SkuSourceTag | undefined;
+  field: string;
+  confidences: Record<string, number>;
+}) {
+  if (!source) return null;
+  const klass = SOURCE_COLORS[source] ?? SOURCE_COLORS.enrichment;
+  const conf = confidences[field];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[9px] font-mono ${klass}`}
+      title={`${field} · ${source}${conf != null ? ` · conf ${(conf * 100).toFixed(0)}%` : ""}`}
+    >
+      {source}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Small layout building blocks
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="px-6 pb-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-3 border-t border-border/[0.05] text-left"
+      >
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70 flex items-center gap-2">
+          {title}
+          {count !== undefined && (
+            <span className="text-muted-foreground/40 tabular-nums">({count})</span>
+          )}
+        </span>
+        {open ? (
+          <ChevronUp size={14} className="text-muted-foreground/50" />
+        ) : (
+          <ChevronDown size={14} className="text-muted-foreground/50" />
+        )}
+      </button>
+      {open && <div className="pt-1">{children}</div>}
+    </div>
+  );
+}
+
+function Meta({
+  label,
+  value,
+  source,
+  field,
+  confidences,
+}: {
+  label: string;
+  value: string;
+  source: SkuSourceTag | undefined;
+  field: string;
+  confidences: Record<string, number>;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-muted-foreground/55 uppercase tracking-wider text-[10px] font-bold">
+        {label}
+      </span>
+      <span className="text-foreground/90 font-semibold">{value}</span>
+      {source && <SourcePill source={source} field={field} confidences={confidences} />}
+    </span>
+  );
+}
+
+function MetaMono({
+  label,
+  value,
+  onCopy,
+  copied,
+  source,
+  field,
+  confidences,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  copied: boolean;
+  source: SkuSourceTag | undefined;
+  field: string;
+  confidences: Record<string, number>;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-muted-foreground/55 uppercase tracking-wider text-[10px] font-bold">
+        {label}
+      </span>
+      <span className="font-mono text-foreground/85">{value}</span>
+      <button
+        onClick={onCopy}
+        className="text-muted-foreground/45 hover:text-foreground/80"
+        aria-label={`Copy ${label}`}
+      >
+        {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+      </button>
+      {source && <SourcePill source={source} field={field} confidences={confidences} />}
+    </span>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "emerald" | "amber" | "red" | undefined;
+}) {
+  const toneClass =
+    tone === "emerald"
+      ? "text-emerald-300"
+      : tone === "amber"
+        ? "text-amber-300"
+        : tone === "red"
+          ? "text-red-300"
+          : "text-foreground/90";
+  return (
+    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">
+        {label}
+      </p>
+      <p className={`mt-0.5 text-sm font-semibold tabular-nums truncate ${toneClass}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PricingCard({
+  pricing,
+  source,
+  field,
+  confidences,
+}: {
+  pricing: SkuJson["pricing"] | null;
+  source?: SkuSourceTag;
+  field: string;
+  confidences: Record<string, number>;
+}) {
+  const list = pricing?.list_price ?? null;
+  const sale = pricing?.sale_price ?? null;
+  const currency = pricing?.currency ?? null;
+  const discount = pricing?.discount_percent ?? null;
+  const hasSale = sale != null && list != null && sale < list;
+  return (
+    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55 flex items-center gap-1.5">
+        Price {source && <SourcePill source={source} field={field} confidences={confidences} />}
+      </p>
+      <div className="mt-0.5 flex items-baseline gap-2 flex-wrap">
+        {hasSale ? (
+          <>
+            <span className="text-sm font-bold text-foreground/95 tabular-nums">
+              {formatPrice(sale!, currency)}
+            </span>
+            <span className="text-[11px] line-through text-muted-foreground/55 tabular-nums">
+              {formatPrice(list!, currency)}
+            </span>
+            {discount != null && (
+              <span className="text-[10px] font-bold text-emerald-400">
+                −{Math.round(discount)}%
+              </span>
+            )}
+          </>
+        ) : list != null ? (
+          <span className="text-sm font-bold text-foreground/95 tabular-nums">
+            {formatPrice(list, currency)}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground/60">—</span>
+        )}
+      </div>
+      {pricing?.price_per_unit && (
+        <p className="mt-0.5 text-[10px] text-muted-foreground/55 tabular-nums">
+          {pricing.price_per_unit}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DefRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="text-muted-foreground/55 uppercase tracking-wider text-[10px] font-bold shrink-0">
+        {label}
+      </dt>
+      <dd className="text-foreground/85 break-words">{value}</dd>
+    </div>
+  );
+}
+
+function FooterBtn({
+  onClick,
+  icon,
+  label,
+  active,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-md border text-xs flex items-center gap-1.5 ${
+        active
+          ? "bg-primary/15 border-primary/30 text-primary"
+          : "bg-white/[0.04] border-border/[0.08] text-foreground/70 hover:bg-white/[0.07]"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function formatPrice(value: number, currency: string | null): string {
+  const sym =
+    currency === "USD"
+      ? "$"
+      : currency === "EUR"
+        ? "€"
+        : currency === "GBP"
+          ? "£"
+          : currency === "INR"
+            ? "₹"
+            : "";
+  return `${sym}${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}${sym ? "" : ` ${currency ?? ""}`.trimEnd()}`;
+}
+
+function formatAttrValue(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map((x) => String(x)).join(", ");
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-rung provenance (legacy canonical-field source breakdown)
+// ─────────────────────────────────────────────────────────────────────────────
+
 const RUNG_TONE: Record<string, string> = {
-  json_ld:                "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
-  opengraph:              "bg-sky-500/15 text-sky-300 border-sky-500/20",
-  microdata:              "bg-sky-500/15 text-sky-300 border-sky-500/20",
-  rdfa:                   "bg-sky-500/15 text-sky-300 border-sky-500/20",
-  nuxt:                   "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
-  next_data:              "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
-  initial_state:          "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
-  shopify_probe:          "bg-purple-500/15 text-purple-300 border-purple-500/20",
-  shopify_products_json:  "bg-purple-500/15 text-purple-300 border-purple-500/20",
-  magento:                "bg-purple-500/15 text-purple-300 border-purple-500/20",
-  woocommerce:            "bg-purple-500/15 text-purple-300 border-purple-500/20",
-  algolia:                "bg-purple-500/15 text-purple-300 border-purple-500/20",
-  breadcrumb_list:        "bg-sky-500/15 text-sky-300 border-sky-500/20",
-  dom_heuristic:          "bg-amber-500/15 text-amber-300 border-amber-500/20",
-  vision_llm:             "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/20",
-  llm_gap_fill:           "bg-rose-500/15 text-rose-300 border-rose-500/20"
+  json_ld: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
+  opengraph: "bg-sky-500/15 text-sky-300 border-sky-500/20",
+  microdata: "bg-sky-500/15 text-sky-300 border-sky-500/20",
+  rdfa: "bg-sky-500/15 text-sky-300 border-sky-500/20",
+  nuxt: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
+  next_data: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
+  initial_state: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
+  shopify_probe: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+  shopify_products_json: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+  magento: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+  woocommerce: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+  algolia: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+  breadcrumb_list: "bg-sky-500/15 text-sky-300 border-sky-500/20",
+  dom_heuristic: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+  vision_llm: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/20",
+  llm_gap_fill: "bg-rose-500/15 text-rose-300 border-rose-500/20",
 };
 
 const RUNG_LABEL: Record<string, string> = {
-  json_ld:                "JSON-LD",
-  opengraph:              "OpenGraph",
-  microdata:              "Microdata",
-  rdfa:                   "RDFa",
-  nuxt:                   "Nuxt",
-  next_data:              "Next data",
-  initial_state:          "Initial state",
-  shopify_probe:          "Shopify probe",
-  shopify_products_json:  "Shopify JSON",
-  magento:                "Magento",
-  woocommerce:            "WooCommerce",
-  algolia:                "Algolia",
-  breadcrumb_list:        "Breadcrumb",
-  dom_heuristic:          "DOM heuristic",
-  vision_llm:             "Vision LLM",
-  llm_gap_fill:           "LLM gap-fill"
+  json_ld: "JSON-LD",
+  opengraph: "OpenGraph",
+  microdata: "Microdata",
+  rdfa: "RDFa",
+  nuxt: "Nuxt",
+  next_data: "Next data",
+  initial_state: "Initial state",
+  shopify_probe: "Shopify probe",
+  shopify_products_json: "Shopify JSON",
+  magento: "Magento",
+  woocommerce: "WooCommerce",
+  algolia: "Algolia",
+  breadcrumb_list: "Breadcrumb",
+  dom_heuristic: "DOM heuristic",
+  vision_llm: "Vision LLM",
+  llm_gap_fill: "LLM gap-fill",
 };
 
 function rungChip(rung: ProvenanceRung) {
@@ -390,26 +917,14 @@ function rungChip(rung: ProvenanceRung) {
     const retailer = rung.split(":")[1] ?? "site";
     return {
       tone: "bg-primary/15 text-primary border-primary/25",
-      label: `Per-site: ${retailer}`
+      label: `Per-site: ${retailer}`,
     };
   }
   return {
     tone: RUNG_TONE[rung as string] ?? "bg-white/[0.04] border-border/[0.08] text-foreground/70",
-    label: RUNG_LABEL[rung as string] ?? rung
+    label: RUNG_LABEL[rung as string] ?? rung,
   };
 }
-
-const TIER_TONE = {
-  authoritative:  { tone: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20", label: "Tier 1 · Authoritative" },
-  inferred:       { tone: "bg-amber-500/15 text-amber-300 border-amber-500/20",       label: "Tier 2 · Inferred" },
-  promoted_draft: { tone: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/20",  label: "Promoted draft" }
-} as const;
-
-const SOURCE_LANE_META: Record<string, { icon: typeof Globe; label: string }> = {
-  link_url:              { icon: Globe, label: "Link" },
-  templated_csv:         { icon: FileSpreadsheet, label: "CSV" },
-  marketplace_connector: { icon: Plug, label: "Marketplace" }
-};
 
 function Provenance({ productId }: { productId: string }) {
   const [data, setData] = useState<ProductProvenance | null>(null);
@@ -418,86 +933,66 @@ function Provenance({ productId }: { productId: string }) {
 
   useEffect(() => {
     if (!open || data) return;
-    api.getProductProvenance(productId)
+    api
+      .getProductProvenance(productId)
       .then(setData)
       .catch((e) => setError((e as Error).message));
   }, [open, productId, data]);
 
   return (
-    <div className="mt-5">
+    <div className="px-6 pb-4">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-foreground/80"
+        className="w-full flex items-center justify-between py-3 border-t border-border/[0.05] text-left"
       >
-        <Sparkles size={11} />
-        Provenance
-        <span className="text-muted-foreground/40 normal-case tracking-normal text-[10px]">
-          {open ? "▴ hide" : "▾ show"}
-        </span>
-      </button>
-
-      {open && (
-        <div className="mt-3">
-          {/* Tier + source-lane chips */}
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70 flex items-center gap-2">
+          Per-field provenance
           {data && (
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {data.category_tier && (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${TIER_TONE[data.category_tier].tone}`}>
-                  <Layers size={10} className="inline mr-1" />
-                  {TIER_TONE[data.category_tier].label}
-                </span>
-              )}
-              {data.source_types.map((st) => {
-                const meta = SOURCE_LANE_META[st] ?? { icon: Globe, label: st };
-                const Icon = meta.icon;
-                return (
-                  <span
-                    key={st}
-                    className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/[0.04] border border-border/[0.08] text-foreground/75"
-                  >
-                    <Icon size={10} className="inline mr-1" />
-                    {meta.label}
-                  </span>
-                );
-              })}
-              {data.category_schema_version && (
-                <span className="text-[10px] font-mono text-muted-foreground/50">
-                  {data.category_schema_version}
-                </span>
-              )}
-            </div>
+            <span className="text-muted-foreground/40 tabular-nums">({data.fields.length})</span>
           )}
-
-          {error && (
-            <p className="text-xs text-red-300">{error}</p>
-          )}
-
+        </span>
+        {open ? (
+          <ChevronUp size={14} className="text-muted-foreground/50" />
+        ) : (
+          <ChevronDown size={14} className="text-muted-foreground/50" />
+        )}
+      </button>
+      {open && (
+        <div className="pt-2">
+          {error && <p className="text-xs text-red-300">{error}</p>}
           {!data && !error && (
-            <p className="text-xs text-muted-foreground/50 italic">Loading provenance…</p>
+            <p className="text-xs text-muted-foreground/45 italic">Loading…</p>
           )}
-
           {data && data.fields.length === 0 && (
-            <p className="text-xs text-muted-foreground/50">No provenance facts recorded.</p>
+            <p className="text-xs text-muted-foreground/45">No provenance facts recorded.</p>
           )}
-
           {data && data.fields.length > 0 && (
             <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] divide-y divide-border/[0.04]">
               {data.fields.map((f, i) => {
                 const chip = rungChip(f.rung);
                 const conf = (f.confidence * 100).toFixed(0);
                 const confTone =
-                  f.confidence >= 0.9 ? "text-emerald-300"
-                  : f.confidence >= 0.7 ? "text-amber-300"
-                  : "text-red-300";
+                  f.confidence >= 0.9
+                    ? "text-emerald-300"
+                    : f.confidence >= 0.7
+                      ? "text-amber-300"
+                      : "text-red-300";
                 return (
                   <div
                     key={`${f.canonical_path ?? f.raw_key}-${i}`}
                     className="flex items-center gap-3 px-3 py-2 text-xs"
                   >
-                    <span className="font-mono text-foreground/75 truncate" title={f.canonical_path ?? f.raw_key}>
-                      {f.canonical_path ?? <span className="text-muted-foreground/50">{f.raw_key}</span>}
+                    <span
+                      className="font-mono text-foreground/80 truncate"
+                      title={f.canonical_path ?? f.raw_key}
+                    >
+                      {f.canonical_path ?? (
+                        <span className="text-muted-foreground/50">{f.raw_key}</span>
+                      )}
                     </span>
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${chip.tone}`}>
+                    <span
+                      className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${chip.tone}`}
+                    >
                       {chip.label}
                     </span>
                     <span className={`ml-auto tabular-nums font-semibold ${confTone}`}>
@@ -510,50 +1005,6 @@ function Provenance({ productId }: { productId: string }) {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-  copyable,
-  onCopy,
-  copied,
-}: {
-  label: string;
-  value: string;
-  tone?: "emerald" | "amber" | "red" | undefined;
-  copyable?: { label: string; value: string } | undefined;
-  onCopy?: ((label: string, value: string) => void) | undefined;
-  copied?: string | null | undefined;
-}) {
-  const toneClass =
-    tone === "emerald"
-      ? "text-emerald-300"
-      : tone === "amber"
-        ? "text-amber-300"
-        : tone === "red"
-          ? "text-red-300"
-          : "text-foreground/90";
-  return (
-    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">{label}</p>
-      <div className="mt-0.5 flex items-baseline justify-between gap-2">
-        <p className={`text-sm font-semibold tabular-nums truncate ${toneClass}`} title={value}>
-          {value}
-        </p>
-        {copyable && onCopy && (
-          <button
-            onClick={() => onCopy(copyable.label, copyable.value)}
-            className="text-muted-foreground/50 hover:text-foreground/80"
-            aria-label={`Copy ${copyable.label}`}
-          >
-            {copied === copyable.label ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
