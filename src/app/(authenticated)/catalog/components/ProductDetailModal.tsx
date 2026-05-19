@@ -13,7 +13,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Star,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -41,6 +40,7 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
   const [imageIdx, setImageIdx] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [showJson, setShowJson] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sku, setSku] = useState<SkuJson | null>(null);
@@ -92,6 +92,53 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
   const fieldSource = sku?._field_source ?? {};
   const fieldConfidence = sku?._field_confidence ?? {};
   const validationWarnings = meta?.validation_warnings ?? [];
+
+  // Collapse Model/MPN/SKU into one row when they're the same string.
+  // PDPs commonly emit all three with identical values; showing them
+  // separately just creates visual noise.
+  const identifiers = useMemo(() => {
+    const seen = new Map<string, { label: string; field: string }>();
+    const add = (label: string, field: string, value: unknown) => {
+      if (value == null) return;
+      const norm = String(value).trim();
+      if (!norm) return;
+      const existing = seen.get(norm);
+      if (existing) {
+        // Merge label: "Model 8844091" instead of three rows.
+        existing.label = `${existing.label}/${label}`;
+        return;
+      }
+      seen.set(norm, { label, field });
+    };
+    add("GTIN", "gtin", gtin);
+    add("Model", "model_number", modelNumber);
+    add("MPN", "mpn", mpn);
+    add("SKU", "sku", internalSku);
+    return Array.from(seen, ([value, meta]) => ({ value, label: meta.label, field: meta.field }));
+  }, [gtin, modelNumber, mpn, internalSku]);
+
+  // Recover rating/review_count from attributes when the canonical ratings.*
+  // fields didn't get extracted (LLM sometimes puts them in attributes instead).
+  const effectiveRating = useMemo(() => {
+    const fromCanonical = ratings?.average != null ? ratings.average : null;
+    const fromAttr =
+      attributes.rating?.value ??
+      attributes.average_rating?.value ??
+      attributes.rating_average?.value ??
+      null;
+    const avg = fromCanonical ?? (typeof fromAttr === "number" ? fromAttr : Number(fromAttr));
+    const countCanonical = ratings?.count ?? null;
+    const countAttr =
+      attributes.review_count?.value ??
+      attributes.rating_count?.value ??
+      attributes.reviews?.value ??
+      null;
+    const count = countCanonical ?? (typeof countAttr === "number" ? countAttr : Number(countAttr));
+    return {
+      average: Number.isFinite(avg) ? (avg as number) : null,
+      count: Number.isFinite(count) ? (count as number) : null,
+    };
+  }, [ratings, attributes]);
 
   const images = useMemo(() => {
     if (sku?.images && sku.images.length > 0) {
@@ -242,80 +289,113 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
           </div>
 
           {/* ─── Detail column ─── */}
-          <div className="min-w-0">
+          <div className="min-w-0 flex flex-col gap-5">
             {/* Breadcrumbs */}
             {breadcrumbs.length > 0 && (
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50 mb-1.5 truncate">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50 truncate">
                 {breadcrumbs.join(" › ")}
               </p>
             )}
 
-            {/* Title row */}
-            <div className="flex items-start gap-2 flex-wrap">
-              <h2 className="font-serif text-2xl font-bold text-foreground/95 leading-tight flex-1 min-w-0">
+            {/* Title */}
+            <div>
+              <h2 className="font-serif text-2xl font-bold text-foreground/95 leading-tight">
                 {title}
               </h2>
-              <SourcePill source={fieldSource.title} field="title" confidences={fieldConfidence} />
-            </div>
-
-            {/* Brand · GTIN · MPN · Model · SKU */}
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
               {brand && (
-                <Meta label="Brand" value={brand} source={fieldSource.brand} field="brand" confidences={fieldConfidence} />
-              )}
-              {gtin && (
-                <MetaMono label="GTIN" value={gtin} onCopy={() => copy("GTIN", gtin)} copied={copied === "GTIN"} source={fieldSource.gtin} field="gtin" confidences={fieldConfidence} />
-              )}
-              {modelNumber && (
-                <MetaMono label="Model" value={modelNumber} onCopy={() => copy("Model", modelNumber)} copied={copied === "Model"} source={fieldSource.model_number} field="model_number" confidences={fieldConfidence} />
-              )}
-              {mpn && (
-                <MetaMono label="MPN" value={mpn} onCopy={() => copy("MPN", mpn)} copied={copied === "MPN"} source={fieldSource.mpn} field="mpn" confidences={fieldConfidence} />
-              )}
-              {internalSku && (
-                <MetaMono label="SKU" value={internalSku} onCopy={() => copy("SKU", internalSku)} copied={copied === "SKU"} source={fieldSource.sku} field="sku" confidences={fieldConfidence} />
+                <p className="mt-1.5 text-sm text-muted-foreground/80">
+                  by <span className="text-foreground/90 font-semibold">{brand}</span>
+                  {seller?.name && seller.name !== brand && (
+                    <span className="text-muted-foreground/60">
+                      {" · sold by "}
+                      <span className="text-foreground/80">{seller.name}</span>
+                      {seller.is_official && (
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-sky-500/10 text-sky-300 border border-sky-500/20 align-middle">
+                          Official
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </p>
               )}
             </div>
 
-            {/* Pricing + rating + confidence row */}
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <PricingCard pricing={pricing} source={fieldSource.list_price ?? fieldSource.base_price} field="list_price" confidences={fieldConfidence} />
-              <Stat
-                label="Rating"
-                value={
-                  ratings?.average != null
-                    ? `★ ${ratings.average.toFixed(1)}${ratings.count != null ? ` (${ratings.count.toLocaleString()})` : ""}`
-                    : "—"
-                }
-                tone={ratings?.average != null && ratings.average >= 4 ? "emerald" : undefined}
-              />
-              <Stat
-                label="Confidence"
-                value={`${confidence.toFixed(0)}%`}
-                tone={confidence >= 90 ? "emerald" : confidence >= 60 ? "amber" : "red"}
-              />
-              <Stat label="Variants" value={String(variants.length || product.variants.length || 0)} />
+            {/* Price + rating headline */}
+            <div className="flex items-end justify-between gap-4 flex-wrap">
+              <PriceHeadline pricing={pricing} />
+              {effectiveRating.average != null && (
+                <RatingHeadline average={effectiveRating.average} count={effectiveRating.count} />
+              )}
             </div>
 
-            {/* Seller */}
-            {seller?.name && (
-              <div className="mt-3 flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground/60 uppercase tracking-wider text-[10px] font-bold">
-                  Sold by
-                </span>
-                <span className="text-foreground/90 font-semibold">{seller.name}</span>
-                {seller.is_official && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-sky-500/10 text-sky-300 border border-sky-500/20">
-                    Official
-                  </span>
-                )}
-                <SourcePill source={fieldSource.seller_name} field="seller_name" confidences={fieldConfidence} />
-              </div>
+            {/* Short description */}
+            {descShort && (
+              <p className="text-sm text-foreground/75 leading-relaxed">{descShort}</p>
             )}
+
+            {/* Identifiers (deduped) + Confidence + Variants count */}
+            <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] divide-y divide-border/[0.04] text-xs">
+              {identifiers.map((id) => (
+                <div
+                  key={id.value}
+                  className="flex items-center justify-between gap-3 px-3 py-2"
+                >
+                  <span className="text-muted-foreground/65 uppercase tracking-wider text-[10px] font-bold w-24 shrink-0">
+                    {id.label}
+                  </span>
+                  <span className="font-mono text-foreground/85 truncate flex-1 min-w-0">
+                    {id.value}
+                  </span>
+                  <button
+                    onClick={() => copy(id.label, id.value)}
+                    className="text-muted-foreground/40 hover:text-foreground/80 shrink-0"
+                    aria-label={`Copy ${id.label}`}
+                  >
+                    {copied === id.label ? (
+                      <Check size={11} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={11} />
+                    )}
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-muted-foreground/65 uppercase tracking-wider text-[10px] font-bold w-24 shrink-0">
+                  Confidence
+                </span>
+                <span
+                  className={`tabular-nums font-semibold ${
+                    confidence >= 90
+                      ? "text-emerald-300"
+                      : confidence >= 60
+                        ? "text-amber-300"
+                        : "text-red-300"
+                  }`}
+                >
+                  {confidence.toFixed(0)}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-muted-foreground/65 uppercase tracking-wider text-[10px] font-bold w-24 shrink-0">
+                  Variants
+                </span>
+                <span className="tabular-nums text-foreground/85">
+                  {variants.length || product.variants.length || 0}
+                </span>
+              </div>
+              {category && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-muted-foreground/65 uppercase tracking-wider text-[10px] font-bold w-24 shrink-0">
+                    Category
+                  </span>
+                  <span className="text-foreground/85 truncate">{category}</span>
+                </div>
+              )}
+            </div>
 
             {/* Validation warnings */}
             {validationWarnings.length > 0 && (
-              <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
                 <AlertTriangle size={13} className="mt-0.5 shrink-0" />
                 <div className="space-y-0.5">
                   {validationWarnings.map((w, i) => (
@@ -328,9 +408,21 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
               </div>
             )}
 
-            {/* Short description as a callout if present */}
-            {descShort && (
-              <p className="mt-4 text-sm text-foreground/75 leading-relaxed">{descShort}</p>
+            {/* Top highlights inline (first 4) — full list still rendered below */}
+            {highlights.length > 0 && (
+              <ul className="space-y-1.5 text-sm text-foreground/80">
+                {highlights.slice(0, 4).map((h, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-primary/60 shrink-0 mt-0.5">•</span>
+                    <span>{h}</span>
+                  </li>
+                ))}
+                {highlights.length > 4 && (
+                  <li className="text-[10px] uppercase tracking-wider text-muted-foreground/50">
+                    + {highlights.length - 4} more in highlights section
+                  </li>
+                )}
+              </ul>
             )}
           </div>
         </div>
@@ -365,7 +457,7 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
               {Object.entries(attributes).map(([k, a]) => (
                 <div
                   key={k}
-                  className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-xs items-center"
+                  className={`grid ${showSources ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-3 px-3 py-2 text-xs items-center`}
                 >
                   <span className="text-muted-foreground/75 font-mono">
                     {k.replace(/_/g, " ")}
@@ -374,7 +466,7 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
                     {formatAttrValue(a.value)}
                     {a.unit ? <span className="text-muted-foreground/60"> {a.unit}</span> : null}
                   </span>
-                  <SourcePill source={a.source} field={k} confidences={fieldConfidence} />
+                  {showSources && <SourcePill source={a.source} field={k} confidences={fieldConfidence} />}
                 </div>
               ))}
             </div>
@@ -528,6 +620,12 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
               />
             )}
             <FooterBtn
+              onClick={() => setShowSources((s) => !s)}
+              icon={<Code size={12} />}
+              label={showSources ? "Hide sources" : "Show sources"}
+              active={showSources}
+            />
+            <FooterBtn
               onClick={() => setShowJson((s) => !s)}
               icon={<Code size={12} />}
               label={showJson ? "Hide JSON" : "SkuJson"}
@@ -569,9 +667,6 @@ export function ProductDetailModal({ product, onClose, onDelete, busy }: Props) 
         {/* ── Raw SkuJson dump ─────────────────────────────────────────── */}
         {showJson && (
           <div className="px-6 pb-6">
-            <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-emerald-300/80">
-              SkuJson · rebuilt on-demand from extractedFacts
-            </p>
             <pre className="text-[10px] leading-tight bg-black/30 rounded-lg p-3 overflow-x-auto max-h-[28rem] text-foreground/70 border border-border/[0.06]">
 {sku
   ? JSON.stringify(sku, null, 2)
@@ -663,146 +758,62 @@ function Section({
   );
 }
 
-function Meta({
-  label,
-  value,
-  source,
-  field,
-  confidences,
-}: {
-  label: string;
-  value: string;
-  source: SkuSourceTag | undefined;
-  field: string;
-  confidences: Record<string, number>;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="text-muted-foreground/55 uppercase tracking-wider text-[10px] font-bold">
-        {label}
-      </span>
-      <span className="text-foreground/90 font-semibold">{value}</span>
-      {source && <SourcePill source={source} field={field} confidences={confidences} />}
-    </span>
-  );
-}
-
-function MetaMono({
-  label,
-  value,
-  onCopy,
-  copied,
-  source,
-  field,
-  confidences,
-}: {
-  label: string;
-  value: string;
-  onCopy: () => void;
-  copied: boolean;
-  source: SkuSourceTag | undefined;
-  field: string;
-  confidences: Record<string, number>;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="text-muted-foreground/55 uppercase tracking-wider text-[10px] font-bold">
-        {label}
-      </span>
-      <span className="font-mono text-foreground/85">{value}</span>
-      <button
-        onClick={onCopy}
-        className="text-muted-foreground/45 hover:text-foreground/80"
-        aria-label={`Copy ${label}`}
-      >
-        {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-      </button>
-      {source && <SourcePill source={source} field={field} confidences={confidences} />}
-    </span>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "emerald" | "amber" | "red" | undefined;
-}) {
-  const toneClass =
-    tone === "emerald"
-      ? "text-emerald-300"
-      : tone === "amber"
-        ? "text-amber-300"
-        : tone === "red"
-          ? "text-red-300"
-          : "text-foreground/90";
-  return (
-    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">
-        {label}
-      </p>
-      <p className={`mt-0.5 text-sm font-semibold tabular-nums truncate ${toneClass}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PricingCard({
-  pricing,
-  source,
-  field,
-  confidences,
-}: {
-  pricing: SkuJson["pricing"] | null;
-  source?: SkuSourceTag;
-  field: string;
-  confidences: Record<string, number>;
-}) {
+function PriceHeadline({ pricing }: { pricing: SkuJson["pricing"] | null }) {
   const list = pricing?.list_price ?? null;
   const sale = pricing?.sale_price ?? null;
   const currency = pricing?.currency ?? null;
   const discount = pricing?.discount_percent ?? null;
   const hasSale = sale != null && list != null && sale < list;
+  if (list == null && sale == null) {
+    return <p className="text-sm text-muted-foreground/55">No price extracted</p>;
+  }
   return (
-    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55 flex items-center gap-1.5">
-        Price {source && <SourcePill source={source} field={field} confidences={confidences} />}
-      </p>
-      <div className="mt-0.5 flex items-baseline gap-2 flex-wrap">
-        {hasSale ? (
-          <>
-            <span className="text-sm font-bold text-foreground/95 tabular-nums">
-              {formatPrice(sale!, currency)}
-            </span>
-            <span className="text-[11px] line-through text-muted-foreground/55 tabular-nums">
-              {formatPrice(list!, currency)}
-            </span>
-            {discount != null && (
-              <span className="text-[10px] font-bold text-emerald-400">
-                −{Math.round(discount)}%
-              </span>
-            )}
-          </>
-        ) : list != null ? (
-          <span className="text-sm font-bold text-foreground/95 tabular-nums">
-            {formatPrice(list, currency)}
+    <div className="flex items-baseline gap-3 flex-wrap">
+      {hasSale ? (
+        <>
+          <span className="text-3xl font-bold text-foreground/95 tabular-nums leading-none">
+            {formatPrice(sale!, currency)}
           </span>
-        ) : (
-          <span className="text-sm text-muted-foreground/60">—</span>
-        )}
-      </div>
+          <span className="text-sm line-through text-muted-foreground/55 tabular-nums">
+            {formatPrice(list!, currency)}
+          </span>
+          {discount != null && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+              −{Math.round(discount)}%
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="text-3xl font-bold text-foreground/95 tabular-nums leading-none">
+          {formatPrice((list ?? sale)!, currency)}
+        </span>
+      )}
       {pricing?.price_per_unit && (
-        <p className="mt-0.5 text-[10px] text-muted-foreground/55 tabular-nums">
+        <span className="text-[11px] text-muted-foreground/55 tabular-nums">
           {pricing.price_per_unit}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function RatingHeadline({ average, count }: { average: number; count: number | null }) {
+  const tone =
+    average >= 4 ? "text-emerald-300" : average >= 3 ? "text-amber-300" : "text-red-300";
+  return (
+    <div className="text-right">
+      <p className={`text-lg font-bold tabular-nums ${tone}`}>
+        ★ {average.toFixed(1)}
+      </p>
+      {count != null && (
+        <p className="text-[10px] text-muted-foreground/55 tabular-nums">
+          {count.toLocaleString()} reviews
         </p>
       )}
     </div>
   );
 }
+
 
 function DefRow({ label, value }: { label: string; value: string }) {
   return (
@@ -824,7 +835,7 @@ function FooterBtn({
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
-  active?: boolean;
+  active?: boolean | undefined;
 }) {
   return (
     <button
