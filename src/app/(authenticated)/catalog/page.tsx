@@ -235,9 +235,23 @@ function ProductRow({
         first ? "" : "border-t border-border/[0.06]",
       ].join(" ")}
     >
-      {/* Icon placeholder — new schema has no image in list row */}
+      {/* Thumbnail projected from winning_values.images; placeholder when absent. */}
       <div className="size-11 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
-        <Package size={18} className="text-muted-foreground/30" strokeWidth={1.2} />
+        {product.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs, no next/image loader configured
+          <img
+            src={product.imageUrl}
+            alt={product.title ?? "Product image"}
+            className="size-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              // Hide a broken image so the tile falls back to empty rather than a broken-img glyph.
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <Package size={18} className="text-muted-foreground/30" strokeWidth={1.2} />
+        )}
       </div>
 
       <div className="min-w-0">

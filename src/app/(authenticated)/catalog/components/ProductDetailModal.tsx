@@ -73,7 +73,36 @@ function renderValue(v: unknown): string {
   if (v == null) return "—";
   if (typeof v === "string") return v || "—";
   if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "—";
+    // Arrays of scalars → readable comma list; arrays of objects → count.
+    const allScalar = v.every((x) => x == null || typeof x !== "object");
+    return allScalar ? v.map((x) => String(x)).join(", ") : `${v.length} items`;
+  }
+  if (typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>).filter(
+      ([, val]) => val != null
+    );
+    if (entries.length === 0) return "—";
+    return entries
+      .slice(0, 4)
+      .map(([k, val]) => `${k}: ${typeof val === "object" ? JSON.stringify(val) : String(val)}`)
+      .join(" · ");
+  }
   return JSON.stringify(v);
+}
+
+/** Pull the winning images array (SkuImage[]) out of winning_values, if any. */
+function extractImages(
+  winningValues: Record<string, unknown>
+): Array<{ url: string; role?: string; alt_text?: string | null }> {
+  const extracted = extractWinningValue(winningValues, "images");
+  const val = extracted?.value;
+  if (!Array.isArray(val)) return [];
+  return val.filter(
+    (i): i is { url: string; role?: string; alt_text?: string | null } =>
+      !!i && typeof i === "object" && typeof (i as { url?: unknown }).url === "string"
+  );
 }
 
 function shortId(id: string): string {
@@ -224,6 +253,9 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
             <>
               {/* ── Identity + header ── */}
               <ProductHeader product={product} onCopy={copy} copied={copied} />
+
+              {/* ── Image gallery ── */}
+              <ImagesSection product={product} />
 
               {/* ── Winning attribute values ── */}
               <WinningValuesSection
@@ -411,7 +443,8 @@ function WinningValuesSection({
   onLoadProvenance: (attr: string) => void;
 }) {
   const wv = product.winning_values;
-  const SKIP = new Set(["pricing", "inventory"]);
+  // `images` has its own gallery section; pricing/inventory have dedicated UI.
+  const SKIP = new Set(["pricing", "inventory", "images", "_meta"]);
 
   const attrs = Object.keys(wv).filter((k) => !SKIP.has(k));
 
@@ -544,6 +577,36 @@ function ProvenanceInline({ data }: { data: AttributeProvenance }) {
         <div className="text-amber-400/70 italic">No winning observation for this attribute.</div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ImagesSection
+// ---------------------------------------------------------------------------
+
+function ImagesSection({ product }: { product: CatalogProductView }) {
+  const images = extractImages(product.winning_values);
+  if (images.length === 0) return null;
+
+  return (
+    <Section title={`Images (${images.length})`}>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {images.slice(0, 16).map((img, i) => (
+          // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs, no next/image loader configured
+          <img
+            key={`${img.url}-${i}`}
+            src={img.url}
+            alt={img.alt_text ?? `Image ${i + 1}`}
+            title={img.role ?? undefined}
+            className="size-20 rounded-lg object-cover border border-border/[0.08] shrink-0 bg-white/[0.03]"
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ))}
+      </div>
+    </Section>
   );
 }
 

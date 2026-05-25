@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { QueueItem, QueueStats, StagedDetail, Evidence } from "./lib/lab-types";
 import { QueueStatsHeader } from "./components/QueueStatsHeader";
 import { StagedProductForm } from "./components/StagedProductForm";
+import { ExtractedDetails } from "./components/ExtractedDetails";
 import { LabEvidencePane } from "./components/LabEvidencePane";
 import { MatchCandidateBanner } from "./components/MatchCandidateBanner";
 import { ActionBar } from "./components/ActionBar";
@@ -343,12 +344,15 @@ export default function AnomalyLabPage() {
             )}
 
             {detail ? (
-              <StagedProductForm
-                detail={detail}
-                fillValues={fillValues}
-                onChange={handleFillChange}
-                stillMissing={stillMissing}
-              />
+              <>
+                <StagedProductForm
+                  detail={detail}
+                  fillValues={fillValues}
+                  onChange={handleFillChange}
+                  stillMissing={stillMissing}
+                />
+                <ExtractedDetails observations={detail.observations} />
+              </>
             ) : (
               /* Detail loading shimmer */
               <div className="rounded-xl border border-border/[0.08] bg-card p-5 space-y-3 animate-pulse">

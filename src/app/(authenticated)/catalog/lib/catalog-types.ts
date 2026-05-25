@@ -34,6 +34,11 @@ export interface ListCatalogProductRow {
    * `amount` is a numeric string from the database.
    */
   pricing: { currency: string; amount: string | null } | null;
+  /**
+   * Representative thumbnail URL projected from winning_values.images
+   * (hero image preferred). Null when the product has no images.
+   */
+  imageUrl: string | null;
   _meta: { schema: "new" };
 }
 
