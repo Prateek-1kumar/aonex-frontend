@@ -74,25 +74,32 @@ export default function AnomalyLabPage() {
       setEvidence(null);
       return;
     }
+    let cancelled = false;
     const id = current.stagedProductId;
     setDetail(null);
     setEvidence(null);
     setFillValues({});
     setStillMissing([]);
 
-    void api.lab.getStaged(id).then(setDetail).catch(() => {
-      showToast({ type: "error", message: "Failed to load staged product." });
+    api.lab.getStaged(id).then((d) => {
+      if (!cancelled) setDetail(d);
+    }).catch(() => {
+      if (!cancelled) showToast({ type: "error", message: "Failed to load staged product." });
     });
-    void api.lab.evidence(id).then(setEvidence).catch(() => {
+    api.lab.evidence(id).then((e) => {
+      if (!cancelled) setEvidence(e);
+    }).catch(() => {
       // Evidence is optional — don't block on failure
-      setEvidence({ kind: "none", content: null });
+      if (!cancelled) setEvidence({ kind: "none", content: null });
     });
+
+    return () => { cancelled = true; };
   }, [current?.stagedProductId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleFillChange(field: string, value: string) {
     setFillValues((prev) => ({ ...prev, [field]: value }));
     if (stillMissing.includes(field)) {
-      setStillMissing((prev) => prev.filter((f) => f !== value));
+      setStillMissing((prev) => prev.filter((f) => f !== field));
     }
   }
 
@@ -106,9 +113,17 @@ export default function AnomalyLabPage() {
     const currentQueue = queueRef.current;
     if (nextIndex >= currentQueue.length - 5) {
       try {
-        const merged = await loadQueue(currentQueue);
-        setQueue(merged);
-        queueRef.current = merged;
+        const res = await api.lab.queue();
+        setQueue((prev) => {
+          const viewed = prev.slice(0, nextIndex);               // items already shown this session
+          const viewedIds = new Set(viewed.map((i) => i.stagedProductId));
+          const freshTail = res.items.filter(
+            (i) => !viewedIds.has(i.stagedProductId) && !skippedIdsRef.current.has(i.stagedProductId)
+          );
+          const merged = [...viewed, ...freshTail];
+          queueRef.current = merged;
+          return merged;
+        });
       } catch {
         // silent — just use what we have
       }
@@ -212,8 +227,13 @@ export default function AnomalyLabPage() {
     queueRef.current = queue;
   }, [queue]);
 
+  const FILLABLE_FIELDS = ["title", "brand", "category_path", "identifier"] as const;
   const canApprove =
-    !!detail && !detail.missingFields.includes("pricing.primary");
+    !!detail &&
+    !detail.missingFields.includes("pricing.primary") &&
+    detail.missingFields
+      .filter((f): f is typeof FILLABLE_FIELDS[number] => (FILLABLE_FIELDS as readonly string[]).includes(f))
+      .every((f) => (fillValues[f] ?? "").trim() !== "");
 
   const topLiveCandidate = detail?.matchCandidates?.find((c) => c.kind === "live") ?? null;
   const liveCandidates = detail?.matchCandidates?.filter((c) => c.kind === "live") ?? [];

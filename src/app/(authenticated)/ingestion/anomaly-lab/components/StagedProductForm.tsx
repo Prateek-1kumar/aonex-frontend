@@ -34,7 +34,8 @@ interface PresentValue {
 /** Safely pull a present-value + source/confidence badge from the observations blob. */
 function extractPresent(
   field: string,
-  observations: Record<string, unknown>
+  observations: Record<string, unknown>,
+  proposedIdentity?: Record<string, unknown>
 ): PresentValue | null {
   // observations.observations is an array of observation rows
   const rows = observations.observations;
@@ -42,12 +43,13 @@ function extractPresent(
     const obs = rows as ObsRow[];
     const row = obs.find((r) => r.attributeCode === field);
     if (row && row.value != null) {
+      const conf = Number(row.confidence);
       return {
         value: String(row.value),
         source: row.source != null ? String(row.source) : undefined,
         confidence:
-          row.confidence != null
-            ? `${Math.round(Number(row.confidence) * 100)}%`
+          Number.isFinite(conf)
+            ? `${Math.round(conf * 100)}%`
             : undefined,
       };
     }
@@ -68,10 +70,9 @@ function extractPresent(
     }
   }
 
-  // Check proposedIdentity for common field names
-  const pi = observations.proposedIdentity as Record<string, unknown> | undefined;
-  if (pi && pi[field] != null) {
-    return { value: String(pi[field]), source: undefined, confidence: undefined };
+  // Check top-level proposedIdentity for common field names
+  if (proposedIdentity && proposedIdentity[field] != null) {
+    return { value: String(proposedIdentity[field]), source: undefined, confidence: undefined };
   }
 
   // Check pricingObservations for pricing.primary
@@ -140,7 +141,7 @@ export function StagedProductForm({
       {FILLABLE_FIELDS.map((field) => {
         const isMissing = missing.has(field);
         const isStillMissing = stillMissing.includes(field);
-        const present = isMissing ? null : extractPresent(field, detail.observations);
+        const present = isMissing ? null : extractPresent(field, detail.observations, detail.proposedIdentity);
 
         if (isMissing) {
           return (
@@ -197,7 +198,7 @@ export function StagedProductForm({
         </div>
       ) : (
         (() => {
-          const present = extractPresent("pricing.primary", detail.observations);
+          const present = extractPresent("pricing.primary", detail.observations, detail.proposedIdentity);
           return present ? (
             <div key="pricing.primary">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60 mb-1">

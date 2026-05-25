@@ -161,13 +161,9 @@ async function labMutate(path: string, payload: unknown): Promise<ApproveResult>
     body: JSON.stringify(payload),
   });
   const body = await res.json().catch(() => ({} as Record<string, unknown>));
-  if (res.ok && (body as Record<string, unknown> & { data?: { productId?: string } }).data?.productId) {
-    return { ok: true, productId: (body as { data: { productId: string } }).data.productId };
-  }
-  if (res.status === 400 && (body as { error?: { code?: string; stillMissing?: string[] } }).error?.code === "INCOMPLETE") {
-    return { ok: false, stillMissing: (body as { error: { stillMissing?: string[] } }).error.stillMissing ?? [] };
-  }
-  throw new Error((body as { error?: { message?: string } }).error?.message ?? `HTTP ${res.status}`);
+  if (res.ok) return { ok: true, productId: (body as any).data?.productId ?? "" };
+  if (res.status === 400 && (body as any).error?.code === "INCOMPLETE") return { ok: false, stillMissing: (body as any).error.stillMissing ?? [] };
+  throw new Error((body as any).error?.message ?? `HTTP ${res.status}`);
 }
 
 export const api = {
