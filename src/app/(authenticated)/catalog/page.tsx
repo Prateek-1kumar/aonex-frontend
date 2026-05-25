@@ -7,23 +7,22 @@ import {
   Loader2,
   RefreshCw,
   Search,
-  Tag,
-  ImageOff,
   ChevronRight,
+  Package,
 } from "lucide-react";
-import { api, type CatalogProduct } from "@/lib/api";
+import { api } from "@/lib/api";
+import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { getDisplayPrice } from "./lib/price";
 
 type Toast = { type: "success" | "error"; message: string } | null;
-type StatusFilter = "all" | "active" | "draft";
+type StatusFilter = "all" | "active" | "draft" | "archived";
 
 export default function CatalogPage() {
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [products, setProducts] = useState<ListCatalogProductRow[]>([]);
   const [busy, setBusy] = useState(true);
-  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
-  const [selected, setSelected] = useState<CatalogProduct | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -34,7 +33,7 @@ export default function CatalogPage() {
   async function loadProducts() {
     setBusy(true);
     try {
-      const res = await api.listCatalogProducts();
+      const res = await api.catalog.list();
       setProducts(res.products);
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
@@ -48,19 +47,14 @@ export default function CatalogPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
-  async function handleDelete() {
-    if (!selected) return;
-    setDeleting(true);
+  async function handleDelete(id: string) {
     try {
-      await api.deleteCatalogProduct(selected.id);
-      // Remove from local list so it disappears immediately.
-      setProducts((ps) => ps.filter((p) => p.id !== selected.id));
-      setSelected(null);
+      await api.catalog.delete(id);
+      setProducts((ps) => ps.filter((p) => p.id !== id));
+      setSelectedId(null);
       showToast({ type: "success", message: "Product deleted." });
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -69,8 +63,7 @@ export default function CatalogPage() {
     return products.filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (!term) return true;
-      const v = p.current_version;
-      const haystack = [v?.title, v?.brand, v?.gtin, v?.modelNumber, p.canonicalCategory]
+      const haystack = [p.title, p.brand, p.gtin, p.id]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -81,8 +74,7 @@ export default function CatalogPage() {
   const summary = useMemo(() => {
     const active = products.filter((p) => p.status === "active").length;
     const draft = products.filter((p) => p.status === "draft").length;
-    const skus = products.reduce((acc, p) => acc + p.variants.length, 0);
-    return { total: products.length, active, draft, skus };
+    return { total: products.length, active, draft };
   }, [products]);
 
   return (
@@ -107,7 +99,7 @@ export default function CatalogPage() {
       <div className="mb-5 grid grid-cols-3 gap-3">
         <SummaryCard label="Products" value={summary.total} />
         <SummaryCard label="Active" value={summary.active} tone="emerald" />
-        <SummaryCard label="SKUs" value={summary.skus} />
+        <SummaryCard label="Draft" value={summary.draft} />
       </div>
 
       <div className="mb-5 flex items-center gap-3 flex-wrap">
@@ -116,12 +108,12 @@ export default function CatalogPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, brand, GTIN, model…"
+            placeholder="Search title, brand, GTIN…"
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
           />
         </div>
         <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.02] border border-border/[0.06]">
-          {(["all", "active", "draft"] as StatusFilter[]).map((s) => (
+          {(["all", "active", "draft", "archived"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -152,7 +144,12 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {!busy && filtered.length === 0 ? (
+      {busy && products.length === 0 ? (
+        <div className="rounded-xl border border-border/[0.08] bg-card p-10 flex items-center justify-center gap-2 text-muted-foreground/60">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Loading products…</span>
+        </div>
+      ) : !busy && filtered.length === 0 ? (
         <div className="rounded-xl border border-border/[0.08] bg-card p-10 text-center">
           <p className="font-serif text-lg font-semibold text-foreground/80">
             {products.length === 0 ? "No canonical products yet" : "No products match this filter"}
@@ -170,27 +167,38 @@ export default function CatalogPage() {
               key={product.id}
               product={product}
               first={idx === 0}
-              onClick={() => setSelected(product)}
+              onClick={() => setSelectedId(product.id)}
             />
           ))}
         </div>
       )}
 
-      {selected && (
+      {selectedId && (
         <ProductDetailModal
-          product={selected}
-          busy={deleting}
-          onDelete={handleDelete}
-          onClose={() => setSelected(null)}
+          productId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onDelete={async (id) => handleDelete(id)}
         />
       )}
     </div>
   );
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone?: "emerald" | "muted" }) {
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "emerald" | "muted";
+}) {
   const toneClass =
-    tone === "emerald" ? "text-emerald-300" : tone === "muted" ? "text-muted-foreground/60" : "text-foreground/90";
+    tone === "emerald"
+      ? "text-emerald-300"
+      : tone === "muted"
+        ? "text-muted-foreground/60"
+        : "text-foreground/90";
   return (
     <div className="rounded-xl border border-border/[0.06] bg-card px-4 py-3">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{label}</p>
@@ -204,12 +212,10 @@ function ProductRow({
   first,
   onClick,
 }: {
-  product: CatalogProduct;
+  product: ListCatalogProductRow;
   first: boolean;
   onClick: () => void;
 }) {
-  const v = product.current_version;
-  const confidence = v ? Number(v.confidenceScore) * 100 : 0;
   const price = getDisplayPrice(product);
 
   const statusTone =
@@ -219,29 +225,23 @@ function ProductRow({
         ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
         : "bg-amber-500/10 text-amber-300 border-amber-500/20";
 
-  const confTone =
-    confidence >= 90 ? "text-emerald-300" : confidence >= 60 ? "text-amber-300" : "text-red-300";
-
   return (
     <button
       onClick={onClick}
       className={[
-        "w-full text-left grid grid-cols-[64px_minmax(0,1fr)_auto_auto_18px] gap-5 px-5 py-4 items-center group hover:bg-white/[0.02] transition-colors focus:outline-none focus:bg-white/[0.03]",
+        "w-full text-left grid grid-cols-[44px_minmax(0,1fr)_auto_auto_18px] gap-5 px-5 py-4 items-center group hover:bg-white/[0.02] transition-colors focus:outline-none focus:bg-white/[0.03]",
         first ? "" : "border-t border-border/[0.06]",
       ].join(" ")}
     >
-      <div className="size-16 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
-        {v?.images?.[0]?.url ? (
-          <img src={v.images[0].url} alt={v.title} className="h-full w-full object-cover" />
-        ) : (
-          <ImageOff size={20} className="text-muted-foreground/40" strokeWidth={1.2} />
-        )}
+      {/* Icon placeholder — new schema has no image in list row */}
+      <div className="size-11 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+        <Package size={18} className="text-muted-foreground/30" strokeWidth={1.2} />
       </div>
 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-foreground/95 truncate">
-            {v?.title ?? "Untitled product"}
+            {product.title ?? <span className="text-muted-foreground/50 italic">Untitled</span>}
           </p>
           <span
             className={`shrink-0 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider border ${statusTone}`}
@@ -249,23 +249,21 @@ function ProductRow({
             {product.status}
           </span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground/65 truncate">
-          {[v?.brand, product.canonicalCategory].filter(Boolean).join(" · ") || "Canonical product"}
+        <p className="mt-0.5 text-xs text-muted-foreground/65 truncate">
+          {product.brand ?? "—"}
         </p>
-        <div className="mt-1.5 flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground/45">
-          <span>v{v?.id?.slice(0, 8) ?? "draft"}</span>
-          <span className="flex items-center gap-1">
-            <Tag size={10} />
-            {product.variants.length} SKU{product.variants.length === 1 ? "" : "s"}
+        <div className="mt-1 flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground/40">
+          {product.gtin && <span className="font-mono normal-case tracking-normal">GTIN {product.gtin}</span>}
+          <span className="font-mono normal-case tracking-normal text-muted-foreground/30">
+            {product.id.slice(0, 8)}
           </span>
-          {v?.gtin && <span className="font-mono normal-case tracking-normal">GTIN {v.gtin}</span>}
         </div>
       </div>
 
       <div className="text-right shrink-0">
         <p className="text-sm font-bold tabular-nums text-foreground/90">{price?.text ?? "—"}</p>
-        <p className={`mt-0.5 text-[10px] font-bold tabular-nums ${confTone}`}>
-          {confidence.toFixed(0)}% confident
+        <p className="mt-0.5 text-[10px] text-muted-foreground/40 uppercase tracking-wider">
+          {price ? "repr. price" : "no pricing"}
         </p>
       </div>
 
