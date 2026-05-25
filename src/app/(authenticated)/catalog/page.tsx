@@ -21,6 +21,9 @@ type StatusFilter = "all" | "active" | "draft" | "archived";
 export default function CatalogPage() {
   const [products, setProducts] = useState<ListCatalogProductRow[]>([]);
   const [busy, setBusy] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
   const [toast, setToast] = useState<Toast>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -35,12 +38,31 @@ export default function CatalogPage() {
   async function loadProducts() {
     setBusy(true);
     try {
-      const res = await api.catalog.list();
+      const res = await api.catalog.list({ limit: PAGE_SIZE });
       setProducts(res.products);
+      setNextCursor(res.nextCursor);
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.catalog.list({ limit: PAGE_SIZE, cursor: nextCursor });
+      // Append, de-duping by id in case of overlapping keyset boundaries.
+      setProducts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...res.products.filter((p) => !seen.has(p.id))];
+      });
+      setNextCursor(res.nextCursor);
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -172,6 +194,19 @@ export default function CatalogPage() {
               onClick={() => setSelectedId(product.id)}
             />
           ))}
+        </div>
+      )}
+
+      {nextCursor && (
+        <div className="mt-5 flex justify-center">
+          <button
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+            className="px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-sm text-foreground/80 hover:bg-white/[0.07] disabled:opacity-40 flex items-center gap-2"
+          >
+            {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
         </div>
       )}
 
