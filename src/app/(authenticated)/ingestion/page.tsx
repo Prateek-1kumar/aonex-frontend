@@ -2,9 +2,12 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link2, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor } from "lucide-react";
 import Nango from "@nangohq/frontend";
 import { api } from "@/lib/api";
+import { detectRetailer } from "./lib/per-site-detection";
+import { RecentIngestions } from "./components/RecentIngestions";
+import { TraceModal } from "./components/TraceModal";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -31,6 +34,8 @@ export default function IngestionPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [conns, setConns] = useState<Connection[]>([]);
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const [traceArtifactId, setTraceArtifactId] = useState<string | null>(null);
 
   useEffect(() => { void loadConns(); }, []);
 
@@ -76,12 +81,15 @@ export default function IngestionPage() {
       showToast({ type: "success", message: "URL accepted — canonical extraction has started." });
       setUrl("");
       setCategoryHint("");
+      setRefreshSignal((s) => s + 1);
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
       setBusy(null);
     }
   }
+
+  const detected = detectRetailer(url);
 
   async function connect(marketplace: "shopify") {
     setBusy(marketplace);
@@ -177,6 +185,22 @@ export default function IngestionPage() {
               </p>
             </div>
             <div className="flex flex-col gap-2">
+              {detected && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/20">
+                    {detected.name} parser
+                  </span>
+                  {detected.browserRequired && (
+                    <span className="text-[10px] text-amber-300/80 flex items-center gap-1">
+                      <Monitor size={10} />
+                      Browser render
+                    </span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground/40">
+                    Phase 7 per-site parser will run first
+                  </span>
+                </div>
+              )}
               <input
                 type="url"
                 value={url}
@@ -283,6 +307,22 @@ export default function IngestionPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Recent ingestions */}
+      <div className="mt-6">
+        <RecentIngestions
+          refreshSignal={refreshSignal}
+          onRowClick={(id) => setTraceArtifactId(id)}
+        />
+      </div>
+
+      {/* Trace modal */}
+      {traceArtifactId && (
+        <TraceModal
+          artifactId={traceArtifactId}
+          onClose={() => setTraceArtifactId(null)}
+        />
       )}
     </div>
   );
