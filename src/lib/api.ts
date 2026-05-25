@@ -69,6 +69,161 @@ export interface ReviewTask {
 // haven't been updated yet — note: the shape is different.
 export type { ListCatalogProductRow as CatalogProduct } from "@/app/(authenticated)/catalog/lib/catalog-types";
 
+// ─── Phase 6/8/9 — link ingestion pack ────────────────────────────
+
+export interface RecentIngestion {
+  artifact_id: string;
+  source_external_id: string;
+  status: "pending" | "processing" | "completed" | "failed" | "needs_review";
+  received_at: string;
+  checksum: string;
+  /** "static" | "browser" | "unblock" — Phase 6 escalation tier */
+  escalated_to: "static" | "browser" | "unblock" | null;
+  escalation_reasons: string[];
+  cost_credits: number;
+  final_url: string;
+  fact_count: number;
+  extractor_version: string | null;
+}
+
+export interface IngestionTraceEvent {
+  id: string;
+  event_type: string;
+  /** Phase 2 spine stage: persist_artifact | extract | map | validate | score | diff | approve */
+  stage: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export type SkuSourceTag =
+  | "structured" | "dom" | "llm-text" | "llm-hints" | "llm-link"
+  | "vision" | "per-site" | "enrichment";
+
+export interface SkuImage {
+  url: string;
+  role: "hero" | "gallery" | "swatch" | "lifestyle" | "spec" | "video_thumb";
+  position: number;
+  alt_text: string | null;
+  width: number | null;
+  height: number | null;
+  variant_refs: string[];
+}
+
+export interface SkuVariant {
+  sku: string | null;
+  barcode: string | null;
+  option_values: Record<string, string>;
+  pricing: { list_price: number | null; sale_price: number | null; currency: string | null };
+  image_urls: string[];
+}
+
+export interface SkuJson {
+  title: string | null;
+  brand: string | null;
+  gtin: string | null;
+  mpn: string | null;
+  model_number: string | null;
+  sku: string | null;
+  description_short: string | null;
+  description_long: string | null;
+  highlights: string[];
+  category_path: string | null;
+  category_confidence: number;
+  breadcrumbs: string[];
+  pricing: {
+    list_price: number | null;
+    sale_price: number | null;
+    currency: string | null;
+    discount_percent: number | null;
+    price_per_unit: string | null;
+  };
+  ratings: { average: number | null; count: number | null };
+  seller: { name: string | null; is_official: boolean | null };
+  images: SkuImage[];
+  options: Array<{ name: string; values: string[] }>;
+  variants: SkuVariant[];
+  attributes: Record<string, { value: unknown; unit: string | null; source: SkuSourceTag }>;
+  shipping: {
+    free_shipping: boolean | null;
+    shipping_cost: number | null;
+    weight: { value: number; unit: string } | null;
+    dimensions: { length: number; width: number; height: number; unit: string } | null;
+  };
+  warranty: string | null;
+  return_policy: string | null;
+  _field_confidence: Record<string, number>;
+  _field_source: Record<string, SkuSourceTag>;
+  _extraction_meta: {
+    passes_run: string[];
+    tokens_used: number;
+    cost_usd: number;
+    latency_ms: number;
+    escalated_to: "static" | "browser" | "unblock";
+    budget_exceeded?: boolean;
+    validation_warnings?: Array<{ field: string; reason: string }>;
+  };
+}
+
+export interface IngestionTrace {
+  artifact: {
+    id: string;
+    source_external_id: string;
+    status: string;
+    received_at: string;
+    processing_errors: Array<Record<string, unknown>>;
+  };
+  events: IngestionTraceEvent[];
+  sku?: SkuJson | null;
+}
+
+export type ProvenanceRung =
+  | "json_ld"
+  | "opengraph"
+  | "nuxt"
+  | "next_data"
+  | "initial_state"
+  | "shopify_probe"
+  | "shopify_products_json"
+  | "magento"
+  | "woocommerce"
+  | "algolia"
+  | "rdfa"
+  | "breadcrumb_list"
+  | "microdata"
+  | "dom_heuristic"
+  | "vision_llm"
+  | "llm_gap_fill"
+  | `per_site_parser:${string}`
+  | "direct"
+  | "computed"
+  | "inferred";
+
+export interface ProvenanceField {
+  canonical_path: string | null;
+  raw_key: string;
+  extracted_value: unknown;
+  normalized_value: unknown;
+  source_pointer: string;
+  extraction_method: string;
+  rung: ProvenanceRung;
+  confidence: number;
+  mapping_method: string | null;
+  extractor_version: string;
+  mapper_version: string;
+}
+
+export interface ProductProvenance {
+  product_id: string;
+  version_id: string | null;
+  category_path: string | null;
+  category_schema_version: string | null;
+  /** Phase 3 schema tier. Null when category_path doesn't match a seeded schema. */
+  category_tier: "authoritative" | "inferred" | "promoted_draft" | null;
+  /** Distinct source lanes that contributed facts to this product. */
+  source_types: Array<"link_url" | "templated_csv" | "marketplace_connector">;
+  fields: ProvenanceField[];
+}
+
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(^| )aonex_token=([^;]+)`));
@@ -330,5 +485,19 @@ export const api = {
     link(id: string, confirmedProductId: string, fills: Record<string, unknown>): Promise<ApproveResult> {
       return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/link`, { confirmedProductId, fills });
     },
+  },
+  listRecentIngestions(limit = 20): Promise<{ ingestions: RecentIngestion[] }> {
+    return request<{ ingestions: RecentIngestion[] }>(`/api/ingestions/recent?limit=${limit}`);
+  },
+  getIngestionTrace(artifactId: string): Promise<IngestionTrace> {
+    return request<IngestionTrace>(`/api/ingestions/${encodeURIComponent(artifactId)}/trace`);
+  },
+  getProductProvenance(productId: string): Promise<ProductProvenance> {
+    return request<ProductProvenance>(`/api/catalog/products/${encodeURIComponent(productId)}/provenance`);
+  },
+  getCatalogProductSku(productId: string): Promise<{ sku: SkuJson | null }> {
+    return request<{ sku: SkuJson | null }>(
+      `/api/catalog/products/${encodeURIComponent(productId)}/sku`
+    );
   },
 };
