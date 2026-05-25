@@ -3,6 +3,13 @@ import type {
   ReviewTaskDetail,
   TaskEvidence,
 } from "@/app/(authenticated)/ingestion/anomaly-lab/types";
+import type {
+  QueueItem,
+  QueueStats,
+  StagedDetail,
+  Evidence,
+  ApproveResult,
+} from "@/app/(authenticated)/ingestion/anomaly-lab/lib/lab-types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -145,6 +152,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
   if (!body.data) throw new Error("Malformed response (missing data)");
   return body.data;
+}
+
+async function labMutate(path: string, payload: unknown): Promise<ApproveResult> {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST", credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({} as Record<string, unknown>));
+  if (res.ok && (body as Record<string, unknown> & { data?: { productId?: string } }).data?.productId) {
+    return { ok: true, productId: (body as { data: { productId: string } }).data.productId };
+  }
+  if (res.status === 400 && (body as { error?: { code?: string; stillMissing?: string[] } }).error?.code === "INCOMPLETE") {
+    return { ok: false, stillMissing: (body as { error: { stillMissing?: string[] } }).error.stillMissing ?? [] };
+  }
+  throw new Error((body as { error?: { message?: string } }).error?.message ?? `HTTP ${res.status}`);
 }
 
 export const api = {
@@ -296,5 +319,31 @@ export const api = {
   },
   listCatalogProducts() {
     return request<{ products: CatalogProduct[] }>("/api/catalog/products");
+  },
+
+  lab: {
+    queue(limit = 50, cursor?: string): Promise<{ items: QueueItem[]; nextCursor: string | null }> {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor !== undefined) params.set("cursor", cursor);
+      return request<{ items: QueueItem[]; nextCursor: string | null }>(`/api/lab/queue?${params.toString()}`);
+    },
+    stats(): Promise<QueueStats> {
+      return request<QueueStats>("/api/lab/queue/stats");
+    },
+    getStaged(id: string): Promise<StagedDetail> {
+      return request<StagedDetail>(`/api/lab/staged/${encodeURIComponent(id)}`);
+    },
+    evidence(id: string): Promise<Evidence> {
+      return request<Evidence>(`/api/lab/staged/${encodeURIComponent(id)}/evidence`);
+    },
+    reject(id: string): Promise<{ ok: true }> {
+      return request<{ ok: true }>(`/api/lab/staged/${encodeURIComponent(id)}/reject`, { method: "POST" });
+    },
+    approve(id: string, fills: Record<string, unknown>): Promise<ApproveResult> {
+      return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/approve`, { fills });
+    },
+    link(id: string, confirmedProductId: string, fills: Record<string, unknown>): Promise<ApproveResult> {
+      return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/link`, { confirmedProductId, fills });
+    },
   },
 };
