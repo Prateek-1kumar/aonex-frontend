@@ -3,6 +3,18 @@ import type {
   ReviewTaskDetail,
   TaskEvidence,
 } from "@/app/(authenticated)/ingestion/anomaly-lab/types";
+import type {
+  QueueItem,
+  QueueStats,
+  StagedDetail,
+  Evidence,
+  ApproveResult,
+} from "@/app/(authenticated)/ingestion/anomaly-lab/lib/lab-types";
+import type {
+  ListCatalogProductRow,
+  CatalogProductView,
+  AttributeProvenance,
+} from "@/app/(authenticated)/catalog/lib/catalog-types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -51,40 +63,11 @@ export interface ReviewTask {
   } | null;
 }
 
-export interface CatalogVariant {
-  id: string;
-  variantId: string;
-  productVersionId: string;
-  sku: string | null;
-  barcode: string | null;
-  price: string | null;
-  currency: string | null;
-  inventoryQuantity: string | null;
-  variantAxes: Record<string, string>;
-  createdAt: string;
-}
-
-export interface CatalogProduct {
-  id: string;
-  status: string;
-  canonicalCategory: string | null;
-  updatedAt: string;
-  current_version: {
-    id: string;
-    title: string;
-    brand: string | null;
-    gtin: string | null;
-    modelNumber: string | null;
-    basePrice: string | null;
-    currency: string | null;
-    images: Array<{ url: string; altText?: string }>;
-    description: string | null;
-    confidenceScore: string;
-    merchantExtensionsJson?: Record<string, unknown>;
-    createdAt?: string;
-  } | null;
-  variants: CatalogVariant[];
-}
+// CatalogProduct (legacy) and CatalogVariant have been replaced by the
+// new single-table types in catalog/lib/catalog-types.ts (Phase C refresh).
+// Re-export the new list row as a convenience alias for any imports that
+// haven't been updated yet — note: the shape is different.
+export type { ListCatalogProductRow as CatalogProduct } from "@/app/(authenticated)/catalog/lib/catalog-types";
 
 // ─── Phase 6/8/9 — link ingestion pack ────────────────────────────
 
@@ -302,6 +285,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body.data;
 }
 
+async function labMutate(path: string, payload: unknown): Promise<ApproveResult> {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST", credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({} as Record<string, unknown>));
+  if (res.ok) return { ok: true, productId: (body as any).data?.productId ?? "" };
+  if (res.status === 400 && (body as any).error?.code === "INCOMPLETE") return { ok: false, stillMissing: (body as any).error.stillMissing ?? [] };
+  throw new Error((body as any).error?.message ?? `HTTP ${res.status}`);
+}
+
 export const api = {
   login(email: string, password: string) {
     return fetch("/api/auth/login", {
@@ -443,14 +438,53 @@ export const api = {
   getTaskEvidence(taskId: string): Promise<TaskEvidence> {
     return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
-  deleteCatalogProduct(id: string): Promise<{ id: string; status: string }> {
-    return request<{ id: string; status: string }>(
-      `/api/catalog/products/${encodeURIComponent(id)}`,
-      { method: "DELETE" }
-    );
+  catalog: {
+    list(opts?: { status?: string }): Promise<{ products: ListCatalogProductRow[] }> {
+      const qs = opts?.status ? `?status=${encodeURIComponent(opts.status)}` : "";
+      return request<{ products: ListCatalogProductRow[] }>(`/api/catalog/products${qs}`);
+    },
+    get(id: string, consistency: "strong" | "eventual" = "strong"): Promise<CatalogProductView> {
+      return request<CatalogProductView>(
+        `/api/catalog/products/${encodeURIComponent(id)}?consistency=${consistency}`
+      );
+    },
+    attributeProvenance(id: string, attr: string): Promise<AttributeProvenance> {
+      return request<AttributeProvenance>(
+        `/api/catalog/products/${encodeURIComponent(id)}/provenance/${encodeURIComponent(attr)}`
+      );
+    },
+    delete(id: string): Promise<{ id: string; status: string }> {
+      return request<{ id: string; status: string }>(
+        `/api/catalog/products/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+    },
   },
-  listCatalogProducts() {
-    return request<{ products: CatalogProduct[] }>("/api/catalog/products");
+
+  lab: {
+    queue(limit = 50, cursor?: string): Promise<{ items: QueueItem[]; nextCursor: string | null }> {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor !== undefined) params.set("cursor", cursor);
+      return request<{ items: QueueItem[]; nextCursor: string | null }>(`/api/lab/queue?${params.toString()}`);
+    },
+    stats(): Promise<QueueStats> {
+      return request<QueueStats>("/api/lab/queue/stats");
+    },
+    getStaged(id: string): Promise<StagedDetail> {
+      return request<StagedDetail>(`/api/lab/staged/${encodeURIComponent(id)}`);
+    },
+    evidence(id: string): Promise<Evidence> {
+      return request<Evidence>(`/api/lab/staged/${encodeURIComponent(id)}/evidence`);
+    },
+    reject(id: string): Promise<{ ok: true }> {
+      return request<{ ok: true }>(`/api/lab/staged/${encodeURIComponent(id)}/reject`, { method: "POST" });
+    },
+    approve(id: string, fills: Record<string, unknown>): Promise<ApproveResult> {
+      return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/approve`, { fills });
+    },
+    link(id: string, confirmedProductId: string, fills: Record<string, unknown>): Promise<ApproveResult> {
+      return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/link`, { confirmedProductId, fills });
+    },
   },
   listRecentIngestions(limit = 20): Promise<{ ingestions: RecentIngestion[] }> {
     return request<{ ingestions: RecentIngestion[] }>(`/api/ingestions/recent?limit=${limit}`);
