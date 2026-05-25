@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -25,6 +25,8 @@ export default function CatalogPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const handleClose = useCallback(() => setSelectedId(null), []);
 
   useEffect(() => {
     void loadProducts();
@@ -176,7 +178,7 @@ export default function CatalogPage() {
       {selectedId && (
         <ProductDetailModal
           productId={selectedId}
-          onClose={() => setSelectedId(null)}
+          onClose={handleClose}
           onDelete={async (id) => handleDelete(id)}
         />
       )}
