@@ -439,9 +439,19 @@ export const api = {
     return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
   catalog: {
-    list(opts?: { status?: string }): Promise<{ products: ListCatalogProductRow[] }> {
-      const qs = opts?.status ? `?status=${encodeURIComponent(opts.status)}` : "";
-      return request<{ products: ListCatalogProductRow[] }>(`/api/catalog/products${qs}`);
+    list(opts?: {
+      status?: string;
+      limit?: number;
+      cursor?: string;
+    }): Promise<{ products: ListCatalogProductRow[]; nextCursor: string | null }> {
+      const params = new URLSearchParams();
+      if (opts?.status) params.set("status", opts.status);
+      if (opts?.limit) params.set("limit", String(opts.limit));
+      if (opts?.cursor) params.set("cursor", opts.cursor);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      return request<{ products: ListCatalogProductRow[]; nextCursor: string | null }>(
+        `/api/catalog/products${qs}`
+      );
     },
     get(id: string, consistency: "strong" | "eventual" = "strong"): Promise<CatalogProductView> {
       return request<CatalogProductView>(
