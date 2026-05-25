@@ -123,6 +123,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
   // Load product detail on mount
   useEffect(() => {
     let cancelled = false;
+    setProvenance({});
     setLoading(true);
     setLoadError(null);
     api.catalog
@@ -601,14 +602,16 @@ function ChannelPricingBlock({
           </span>
         </div>
         {/* Show first locale's price as preview */}
-        {locales[0] && (
-          <span className="text-xs font-semibold tabular-nums text-foreground/80 shrink-0">
-            {locales[0][1].currency}{" "}
-            {locales[0][1].primaryAmount != null
-              ? Number(locales[0][1].primaryAmount).toLocaleString()
-              : "—"}
-          </span>
-        )}
+        {locales[0] && (() => {
+          const n = Number(locales[0][1].primaryAmount);
+          return (
+            <span className="text-xs font-semibold tabular-nums text-foreground/80 shrink-0">
+              {Number.isFinite(n)
+                ? `${locales[0][1].currency} ${n.toLocaleString()}`
+                : "—"}
+            </span>
+          );
+        })()}
         <ChevronDown
           size={13}
           className={`text-muted-foreground/40 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
