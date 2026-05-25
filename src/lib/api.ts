@@ -10,6 +10,11 @@ import type {
   Evidence,
   ApproveResult,
 } from "@/app/(authenticated)/ingestion/anomaly-lab/lib/lab-types";
+import type {
+  ListCatalogProductRow,
+  CatalogProductView,
+  AttributeProvenance,
+} from "@/app/(authenticated)/catalog/lib/catalog-types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -58,40 +63,11 @@ export interface ReviewTask {
   } | null;
 }
 
-export interface CatalogVariant {
-  id: string;
-  variantId: string;
-  productVersionId: string;
-  sku: string | null;
-  barcode: string | null;
-  price: string | null;
-  currency: string | null;
-  inventoryQuantity: string | null;
-  variantAxes: Record<string, string>;
-  createdAt: string;
-}
-
-export interface CatalogProduct {
-  id: string;
-  status: string;
-  canonicalCategory: string | null;
-  updatedAt: string;
-  current_version: {
-    id: string;
-    title: string;
-    brand: string | null;
-    gtin: string | null;
-    modelNumber: string | null;
-    basePrice: string | null;
-    currency: string | null;
-    images: Array<{ url: string; altText?: string }>;
-    description: string | null;
-    confidenceScore: string;
-    merchantExtensionsJson?: Record<string, unknown>;
-    createdAt?: string;
-  } | null;
-  variants: CatalogVariant[];
-}
+// CatalogProduct (legacy) and CatalogVariant have been replaced by the
+// new single-table types in catalog/lib/catalog-types.ts (Phase C refresh).
+// Re-export the new list row as a convenience alias for any imports that
+// haven't been updated yet — note: the shape is different.
+export type { ListCatalogProductRow as CatalogProduct } from "@/app/(authenticated)/catalog/lib/catalog-types";
 
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -307,14 +283,27 @@ export const api = {
   getTaskEvidence(taskId: string): Promise<TaskEvidence> {
     return request<TaskEvidence>(`/api/review/tasks/${encodeURIComponent(taskId)}/evidence`);
   },
-  deleteCatalogProduct(id: string): Promise<{ id: string; status: string }> {
-    return request<{ id: string; status: string }>(
-      `/api/catalog/products/${encodeURIComponent(id)}`,
-      { method: "DELETE" }
-    );
-  },
-  listCatalogProducts() {
-    return request<{ products: CatalogProduct[] }>("/api/catalog/products");
+  catalog: {
+    list(opts?: { status?: string }): Promise<{ products: ListCatalogProductRow[] }> {
+      const qs = opts?.status ? `?status=${encodeURIComponent(opts.status)}` : "";
+      return request<{ products: ListCatalogProductRow[] }>(`/api/catalog/products${qs}`);
+    },
+    get(id: string, consistency: "strong" | "eventual" = "strong"): Promise<CatalogProductView> {
+      return request<CatalogProductView>(
+        `/api/catalog/products/${encodeURIComponent(id)}?consistency=${consistency}`
+      );
+    },
+    attributeProvenance(id: string, attr: string): Promise<AttributeProvenance> {
+      return request<AttributeProvenance>(
+        `/api/catalog/products/${encodeURIComponent(id)}/provenance/${encodeURIComponent(attr)}`
+      );
+    },
+    delete(id: string): Promise<{ id: string; status: string }> {
+      return request<{ id: string; status: string }>(
+        `/api/catalog/products/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+    },
   },
 
   lab: {
