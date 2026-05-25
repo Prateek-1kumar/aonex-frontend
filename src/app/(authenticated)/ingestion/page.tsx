@@ -105,7 +105,7 @@ export default function IngestionPage() {
   }
 
   return (
-    <div className="animate-in max-w-8xl">
+    <div className="animate-in w-full max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-serif text-4xl font-bold text-foreground">Ingestion Terminal</h1>
