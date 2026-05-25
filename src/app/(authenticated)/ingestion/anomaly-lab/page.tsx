@@ -1,156 +1,366 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useEffect, useCallback, useState, useRef } from "react";
+import { CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
-import type {
-  ReviewCluster,
-  ReviewTaskDetail,
-  TaskEvidence,
-} from "./types";
-import { ClusterList } from "./components/ClusterList";
-import { DetailPane } from "./components/DetailPane";
-import { EvidencePane } from "./components/EvidencePane";
+import type { QueueItem, QueueStats, StagedDetail, Evidence } from "./lib/lab-types";
+import { QueueStatsHeader } from "./components/QueueStatsHeader";
+import { StagedProductForm } from "./components/StagedProductForm";
+import { LabEvidencePane } from "./components/LabEvidencePane";
+import { MatchCandidateBanner } from "./components/MatchCandidateBanner";
+import { ActionBar } from "./components/ActionBar";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
 export default function AnomalyLabPage() {
-  const [clusters, setClusters] = useState<ReviewCluster[]>([]);
-  const [selectedClusterKey, setSelectedClusterKey] = useState<string | null>(null);
-  const [items, setItems] = useState<ReviewTaskDetail[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [evidence, setEvidence] = useState<TaskEvidence | null>(null);
-  const [busy, setBusy] = useState<string | null>("load-clusters");
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [index, setIndex] = useState(0);
+  const [detail, setDetail] = useState<StagedDetail | null>(null);
+  const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const [stats, setStats] = useState<QueueStats | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
+  const [fillValues, setFillValues] = useState<Record<string, string>>({});
+  const [stillMissing, setStillMissing] = useState<string[]>([]);
 
-  const refresh = useCallback(async () => {
-    setBusy("load-clusters");
-    try {
-      const cs = await api.listReviewClusters("open");
-      setClusters(cs);
-      if (cs.length > 0 && !selectedClusterKey) {
-        setSelectedClusterKey(cs[0]!.clusterKey);
+  // Use a ref so the keyboard handler always sees the latest value without re-registering
+  const skippedIdsRef = useRef<Set<string>>(new Set());
+  const queueRef = useRef<QueueItem[]>([]);
+  const indexRef = useRef(0);
+
+  function showToast(t: Toast) {
+    setToast(t);
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  const loadQueue = useCallback(async (mergeWith?: QueueItem[], knownSkipped?: Set<string>) => {
+    const res = await api.lab.queue();
+    const skipped = knownSkipped ?? skippedIdsRef.current;
+    if (mergeWith) {
+      const existing = new Set(mergeWith.map((i) => i.stagedProductId));
+      const newItems = res.items.filter(
+        (i) => !existing.has(i.stagedProductId) && !skipped.has(i.stagedProductId)
+      );
+      return [...mergeWith, ...newItems];
+    }
+    return res.items.filter((i) => !skipped.has(i.stagedProductId));
+  }, []);
+
+  // Mount: load queue + stats
+  useEffect(() => {
+    async function init() {
+      setInitialLoading(true);
+      try {
+        const [items, s] = await Promise.all([loadQueue(), api.lab.stats()]);
+        setQueue(items);
+        queueRef.current = items;
+        setStats(s);
+      } catch (e) {
+        showToast({ type: "error", message: (e as Error).message });
+      } finally {
+        setInitialLoading(false);
       }
-    } catch (e) {
-      setToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setBusy(null);
     }
-  }, [selectedClusterKey]);
+    void init();
+  }, [loadQueue]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  // When current item changes: load detail + evidence
+  const current = queue[index] ?? null;
 
   useEffect(() => {
-    if (!selectedClusterKey) {
-      setItems([]);
-      setSelectedTaskId(null);
-      return;
-    }
-    setBusy("load-items");
-    api
-      .listClusterItems(selectedClusterKey)
-      .then((it) => {
-        setItems(it);
-        setSelectedTaskId(it[0]?.id ?? null);
-      })
-      .catch((e) => setToast({ type: "error", message: (e as Error).message }))
-      .finally(() => setBusy(null));
-  }, [selectedClusterKey]);
-
-  useEffect(() => {
-    if (!selectedTaskId) {
+    if (!current) {
+      setDetail(null);
       setEvidence(null);
       return;
     }
-    api
-      .getTaskEvidence(selectedTaskId)
-      .then(setEvidence)
-      .catch(() => setEvidence(null));
-  }, [selectedTaskId]);
+    const id = current.stagedProductId;
+    setDetail(null);
+    setEvidence(null);
+    setFillValues({});
+    setStillMissing([]);
 
-  const showToast = useCallback((t: Toast) => {
-    setToast(t);
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+    void api.lab.getStaged(id).then(setDetail).catch(() => {
+      showToast({ type: "error", message: "Failed to load staged product." });
+    });
+    void api.lab.evidence(id).then(setEvidence).catch(() => {
+      // Evidence is optional — don't block on failure
+      setEvidence({ kind: "none", content: null });
+    });
+  }, [current?.stagedProductId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onClusterResolved = useCallback(async () => {
-    await refresh();
-    showToast({ type: "success", message: "Cluster resolved." });
-  }, [refresh, showToast]);
-
-  const onTaskResolved = useCallback(async () => {
-    if (selectedClusterKey) {
-      const remaining = items.filter((i) => i.id !== selectedTaskId);
-      setItems(remaining);
-      setSelectedTaskId(remaining[0]?.id ?? null);
-      if (remaining.length === 0) await refresh();
+  function handleFillChange(field: string, value: string) {
+    setFillValues((prev) => ({ ...prev, [field]: value }));
+    if (stillMissing.includes(field)) {
+      setStillMissing((prev) => prev.filter((f) => f !== value));
     }
-    showToast({ type: "success", message: "Resolved." });
-  }, [items, selectedTaskId, selectedClusterKey, refresh, showToast]);
+  }
 
-  const selectedCluster = clusters.find((c) => c.clusterKey === selectedClusterKey) ?? null;
-  const selectedTask = items.find((i) => i.id === selectedTaskId) ?? null;
-  const isClusterMode = (selectedCluster?.itemCount ?? 0) >= 3;
+  async function advance(fromIndex?: number) {
+    const idx = fromIndex ?? indexRef.current;
+    const nextIndex = idx + 1;
+    setIndex(nextIndex);
+    indexRef.current = nextIndex;
+
+    // If within 5 of the end, prefetch more items
+    const currentQueue = queueRef.current;
+    if (nextIndex >= currentQueue.length - 5) {
+      try {
+        const merged = await loadQueue(currentQueue);
+        setQueue(merged);
+        queueRef.current = merged;
+      } catch {
+        // silent — just use what we have
+      }
+    }
+  }
+
+  async function handleApprove() {
+    if (!current || !detail) return;
+    setBusy(true);
+    try {
+      const r = await api.lab.approve(current.stagedProductId, fillValues);
+      if (r.ok === false) {
+        setStillMissing(r.stillMissing);
+        showToast({ type: "error", message: "Fill the highlighted fields." });
+      } else {
+        showToast({ type: "success", message: `Approved → product ${r.productId.slice(0, 8)}…` });
+        await advance();
+      }
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReject() {
+    if (!current) return;
+    setBusy(true);
+    try {
+      await api.lab.reject(current.stagedProductId);
+      showToast({ type: "success", message: "Rejected." });
+      await advance();
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleLink(productId: string) {
+    if (!current) return;
+    setBusy(true);
+    try {
+      const r = await api.lab.link(current.stagedProductId, productId, fillValues);
+      if (r.ok === false) {
+        setStillMissing(r.stillMissing);
+        showToast({ type: "error", message: "Fill the highlighted fields." });
+      } else {
+        showToast({ type: "success", message: `Linked to product ${r.productId.slice(0, 8)}…` });
+        await advance();
+      }
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleSkip() {
+    if (!current) return;
+    skippedIdsRef.current.add(current.stagedProductId);
+    void advance();
+  }
+
+  // Keyboard handler
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const active = document.activeElement;
+      const tag = active?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+      switch (e.key.toLowerCase()) {
+        case "a":
+          void handleApprove();
+          break;
+        case "r":
+          void handleReject();
+          break;
+        case "s":
+          handleSkip();
+          break;
+        case "l": {
+          const topLive = detail?.matchCandidates?.find((c) => c.kind === "live");
+          if (topLive) void handleLink(topLive.productId);
+          break;
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, current, busy, fillValues]);
+
+  // Keep indexRef in sync
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
+
+  // Keep queueRef in sync
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  const canApprove =
+    !!detail && !detail.missingFields.includes("pricing.primary");
+
+  const topLiveCandidate = detail?.matchCandidates?.find((c) => c.kind === "live") ?? null;
+  const liveCandidates = detail?.matchCandidates?.filter((c) => c.kind === "live") ?? [];
+
+  const total = queue.length;
+  const position = Math.min(index + 1, total);
+
+  // --- Render ---
+
+  if (initialLoading) {
+    return (
+      <div className="animate-in flex flex-col items-center justify-center py-24 gap-3">
+        <Loader2 size={28} className="animate-spin text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">Loading queue…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-in h-full">
-      <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="animate-in h-full flex flex-col gap-4">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl font-bold text-foreground">Anomaly Lab</h1>
           <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Human Verification Queue
+            Focused Triage Queue
           </p>
         </div>
         <button
-          onClick={() => void refresh()}
-          disabled={busy !== null}
+          onClick={async () => {
+            setInitialLoading(true);
+            try {
+              const [items, s] = await Promise.all([
+                loadQueue(undefined, skippedIdsRef.current),
+                api.lab.stats(),
+              ]);
+              setQueue(items);
+              queueRef.current = items;
+              setStats(s);
+              setIndex(0);
+              indexRef.current = 0;
+            } catch (e) {
+              showToast({ type: "error", message: (e as Error).message });
+            } finally {
+              setInitialLoading(false);
+            }
+          }}
+          disabled={initialLoading}
           className="size-9 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center disabled:opacity-40"
+          aria-label="Refresh queue"
         >
-          {busy === "load-clusters" ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          {initialLoading ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <RefreshCw size={15} />
+          )}
         </button>
       </div>
 
+      {/* Stats header */}
+      <QueueStatsHeader stats={stats} position={position} total={total} />
+
+      {/* Toast */}
       {toast && (
-        <div className={[
-          "mb-5 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
-          toast.type === "success"
-            ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-            : "bg-red-500/10 border border-red-500/20 text-red-400",
-        ].join(" ")}>
-          {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+        <div
+          className={[
+            "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm border",
+            toast.type === "success"
+              ? "bg-card border-emerald-500/20 text-emerald-400"
+              : "bg-card border-red-500/20 text-red-400",
+          ].join(" ")}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 size={15} className="shrink-0" />
+          ) : (
+            <AlertCircle size={15} className="shrink-0" />
+          )}
           {toast.message}
         </div>
       )}
 
-      {clusters.length === 0 ? (
+      {/* Empty state */}
+      {total === 0 || index >= total ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <CheckCircle2 size={40} className="text-emerald-400 mb-4" strokeWidth={1.5} />
-          <p className="font-serif text-lg font-semibold text-foreground/80">All clear</p>
-          <p className="mt-1 text-sm text-muted-foreground">No clusters need review.</p>
+          <p className="font-serif text-lg font-semibold text-foreground/80">
+            All clear — nothing staged
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The triage queue is empty. New items will appear here after ingestion.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-4" style={{ height: "calc(100vh - 220px)" }}>
-          <div className="col-span-3 overflow-y-auto">
-            <ClusterList
-              clusters={clusters}
-              selectedKey={selectedClusterKey}
-              onSelect={setSelectedClusterKey}
+        /* Main triage layout: 2-column */
+        <div
+          className="grid grid-cols-[1fr_360px] gap-4"
+          style={{ minHeight: "calc(100vh - 280px)" }}
+        >
+          {/* Left column: banner + form + actions */}
+          <div className="flex flex-col gap-4 min-w-0">
+            {liveCandidates.length > 0 && (
+              <MatchCandidateBanner
+                candidates={liveCandidates}
+                onLink={(pid) => void handleLink(pid)}
+                busy={busy}
+              />
+            )}
+
+            {detail ? (
+              <StagedProductForm
+                detail={detail}
+                fillValues={fillValues}
+                onChange={handleFillChange}
+                stillMissing={stillMissing}
+              />
+            ) : (
+              /* Detail loading shimmer */
+              <div className="rounded-xl border border-border/[0.08] bg-card p-5 space-y-3 animate-pulse">
+                <div className="h-3 rounded bg-white/[0.05] w-1/3" />
+                <div className="h-8 rounded bg-white/[0.04]" />
+                <div className="h-8 rounded bg-white/[0.04]" />
+                <div className="h-8 rounded bg-white/[0.04]" />
+              </div>
+            )}
+
+            <ActionBar
+              onApprove={() => void handleApprove()}
+              onReject={() => void handleReject()}
+              onSkip={handleSkip}
+              onLink={
+                topLiveCandidate
+                  ? () => void handleLink(topLiveCandidate.productId)
+                  : undefined
+              }
+              canApprove={canApprove}
+              busy={busy}
             />
+
+            {/* Keyboard hint */}
+            <p className="text-[10px] text-muted-foreground/35 uppercase tracking-widest">
+              Keyboard: A approve · R reject · S skip · L link — inactive while typing
+            </p>
           </div>
-          <div className="col-span-6 overflow-y-auto">
-            <DetailPane
-              mode={isClusterMode ? "cluster" : "single"}
-              cluster={selectedCluster}
-              items={items}
-              selectedTask={selectedTask}
-              onSelectTask={setSelectedTaskId}
-              onClusterResolved={onClusterResolved}
-              onTaskResolved={onTaskResolved}
-              onError={(msg) => showToast({ type: "error", message: msg })}
-            />
-          </div>
-          <div className="col-span-3 overflow-y-auto">
-            <EvidencePane evidence={evidence} />
+
+          {/* Right column: evidence */}
+          <div className="flex flex-col overflow-hidden">
+            <LabEvidencePane evidence={evidence} />
           </div>
         </div>
       )}
