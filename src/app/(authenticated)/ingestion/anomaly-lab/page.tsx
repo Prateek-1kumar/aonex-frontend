@@ -229,9 +229,13 @@ export default function AnomalyLabPage() {
   }, [queue]);
 
   const FILLABLE_FIELDS = ["title", "brand", "category_path", "identifier"] as const;
+  const priceSatisfied =
+    !detail?.missingFields.includes("pricing.primary") ||
+    ((fillValues["price"] ?? "").trim() !== "" &&
+      (fillValues["currency"] ?? "").trim() !== "");
   const canApprove =
     !!detail &&
-    !detail.missingFields.includes("pricing.primary") &&
+    priceSatisfied &&
     detail.missingFields
       .filter((f): f is typeof FILLABLE_FIELDS[number] => (FILLABLE_FIELDS as readonly string[]).includes(f))
       .every((f) => (fillValues[f] ?? "").trim() !== "");
