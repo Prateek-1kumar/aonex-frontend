@@ -76,3 +76,58 @@
 .animate-in {
   animation: fadeSlideUp 0.4s ease-out both;
 }
+
+/* ── Landing palette: dark (default) ───────────────────────── */
+:root {
+  --ld-bg:             8  12  13;
+  --ld-surface:       13  18  20;
+  --ld-surface-light: 17  24  32;
+  --ld-border:        30  45  48;
+  --ld-teal:          26 193 206;
+  --ld-teal-dim:      15 138 148;
+  --ld-text:         242 247 248;
+  --ld-muted:         90 122 130;
+  --ld-terminal:       5   8   9;
+  --ld-dim:            rgba(242,247,248,0.65);
+}
+
+/* ── Landing palette: light ─────────────────────────────────── */
+[data-theme="light"] {
+  --ld-bg:             244 248 248;
+  --ld-surface:        235 241 242;
+  --ld-surface-light:  222 231 232;
+  --ld-border:         197 212 215;
+  --ld-teal:            26 193 206;
+  --ld-teal-dim:        15 138 148;
+  --ld-text:            10  18  20;
+  --ld-muted:           77 110 119;
+  --ld-terminal:       221 230 231;
+  --ld-dim:            rgba(10,18,20,0.65);
+}
+
+/* ── Landing: logo theme switching ─────────────────────────── */
+.logo-light { display: none; }
+.logo-dark  { display: block; }
+[data-theme="light"] .logo-light { display: block; }
+[data-theme="light"] .logo-dark  { display: none; }
+
+/* ── Landing: theme-toggle icon switching ───────────────────── */
+.sun-icon  { display: block; }
+.moon-icon { display: none;  }
+[data-theme="light"] .sun-icon  { display: none;  }
+[data-theme="light"] .moon-icon { display: block; }
+
+/* ── Landing: nav scroll state ──────────────────────────────── */
+nav.scrolled { background-color: rgb(var(--ld-bg) / 0.97) !important; }
+
+/* ── Landing: diff strikethrough ────────────────────────────── */
+.strikethrough-line {
+  position: absolute; height: 2px;
+  background-color: #ef4444;
+  width: 0; top: 50%; left: 0;
+  transition: width 0.8s ease;
+}
+.diff-pane-left.crossed .strikethrough-line { width: 100%; }
+
+/* ── Landing: reduced-motion override ───────────────────────── */
+.reduced-motion * { animation: none !important; transition: none !important; }
