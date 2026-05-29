@@ -191,10 +191,54 @@ export function StagedProductForm({
 
       {/* pricing.primary — special case */}
       {missing.has("pricing.primary") ? (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/8 border border-red-500/20">
-          <span className="text-red-400/90 text-sm leading-snug">
-            Missing price — can&apos;t promote in v1; reject or await a priced re-ingest.
-          </span>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400/80 mb-1">
+              Base Price
+              <span className="ml-1 text-amber-500/60 normal-case tracking-normal font-normal">
+                — required
+              </span>
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={fillValues["price"] ?? ""}
+              onChange={(e) => onChange("price", e.target.value)}
+              placeholder="e.g. 79999"
+              className={[
+                "w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
+                stillMissing.includes("pricing.primary")
+                  ? "border-red-500/60 ring-1 ring-red-500/30 focus:border-red-400/80"
+                  : "border-amber-500/30 focus:border-amber-400/50",
+              ].join(" ")}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400/80 mb-1">
+              Currency
+              <span className="ml-1 text-amber-500/60 normal-case tracking-normal font-normal">
+                — required
+              </span>
+            </label>
+            <input
+              type="text"
+              maxLength={3}
+              value={fillValues["currency"] ?? ""}
+              onChange={(e) => onChange("currency", e.target.value.toUpperCase())}
+              placeholder="INR"
+              className={[
+                "w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
+                stillMissing.includes("pricing.primary")
+                  ? "border-red-500/60 ring-1 ring-red-500/30 focus:border-red-400/80"
+                  : "border-amber-500/30 focus:border-amber-400/50",
+              ].join(" ")}
+            />
+          </div>
+          {stillMissing.includes("pricing.primary") && (
+            <p className="text-[10px] text-red-400/80">
+              Both price and currency are required to approve.
+            </p>
+          )}
         </div>
       ) : (
         (() => {
