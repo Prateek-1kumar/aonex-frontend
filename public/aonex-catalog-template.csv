@@ -1,0 +1,5 @@
+primary_identifier,title,brand,gtin,mpn,category,description_long,list_price,sale_price,currency,weight_value,weight_unit,variant_sku,variant_color,variant_size,variant_inventory_qty
+TEE-001,Classic Cotton Tee,Acme,0012345678905,ACME-TEE,Apparel,Soft 100% cotton crew-neck tee,19.99,14.99,USD,0.2,kg,,,,
+MUG-100,Ceramic Mug 350ml,Acme,,ACME-MUG,Kitchen,Dishwasher-safe ceramic mug,9.99,,USD,,,,,,
+HOO-200,Zip Hoodie,Acme,,ACME-HOO,Apparel,Fleece-lined zip hoodie,49.99,,USD,,,HOO-200-BLK-S,Black,S,12
+HOO-200,,,,,,,,,,,,HOO-200-BLK-M,Black,M,8
