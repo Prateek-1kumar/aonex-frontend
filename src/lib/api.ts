@@ -84,6 +84,9 @@ export interface RecentIngestion {
   final_url: string;
   fact_count: number;
   extractor_version: string | null;
+  source_type?: string;
+  filename?: string | null;
+  error_count?: number;
 }
 
 export interface IngestionTraceEvent {
