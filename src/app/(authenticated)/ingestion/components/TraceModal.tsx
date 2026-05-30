@@ -75,7 +75,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
               Ingestion Trace
             </p>
             <p className="mt-0.5 text-sm font-mono text-foreground/90 truncate">
-              {trace?.artifact.source_external_id ?? artifactId}
+              {trace?.artifact?.source_external_id ?? trace?.filename ?? artifactId}
             </p>
           </div>
           <button
@@ -125,6 +125,24 @@ export function TraceModal({ artifactId, onClose }: Props) {
             <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
               <AlertCircle size={14} />
               {error}
+            </div>
+          )}
+
+          {trace?.source_type === "templated_csv" && (
+            <div className="space-y-2 mb-4">
+              <h4 className="text-sm font-semibold">CSV ingestion report</h4>
+              {(trace.processing_errors ?? []).length === 0 ? (
+                <p className="text-xs text-muted-foreground">No row issues — all rows ingested.</p>
+              ) : (
+                <ul className="text-xs space-y-1">
+                  {(trace.processing_errors ?? []).map((e, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="font-mono text-muted-foreground">row {e.row}</span>
+                      <span>{e.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

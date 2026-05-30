@@ -84,6 +84,9 @@ export interface RecentIngestion {
   final_url: string;
   fact_count: number;
   extractor_version: string | null;
+  source_type?: string;
+  filename?: string | null;
+  error_count?: number;
 }
 
 export interface IngestionTraceEvent {
@@ -165,7 +168,7 @@ export interface SkuJson {
 }
 
 export interface IngestionTrace {
-  artifact: {
+  artifact?: {
     id: string;
     source_external_id: string;
     status: string;
@@ -174,6 +177,12 @@ export interface IngestionTrace {
   };
   events: IngestionTraceEvent[];
   sku?: SkuJson | null;
+  // ─── templated_csv trace shape (Task 6) ───
+  artifact_id?: string;
+  source_type?: string;
+  status?: string;
+  filename?: string | null;
+  processing_errors?: Array<{ row: number; code: string; message: string; primaryIdentifier?: string }>;
 }
 
 export type ProvenanceRung =
@@ -352,12 +361,12 @@ export const api = {
   uploadCsv(file: File) {
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${API}/api/ingestion/upload`, {
+    return fetch(`${API}/api/ingestions/csv`, {
       method: "POST",
       credentials: "include",
       body: form,
     }).then(async (res) => {
-      const body = (await res.json()) as ApiEnvelope<{ ingestionId: string; rowCount: number }>;
+      const body = (await res.json()) as ApiEnvelope<{ ingestionId: string; rowCount: number; status: string }>;
       if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
       if (!body.data) throw new Error("Malformed response");
       return body.data;

@@ -56,9 +56,9 @@ export default function IngestionPage() {
     }
     setBusy("file");
     try {
-      await api.uploadCsv(file);
-      showToast({ type: "success", message: "File accepted — processing your catalog." });
-      void loadConns();
+      const { rowCount } = await api.uploadCsv(file);
+      showToast({ type: "success", message: `File accepted — ${rowCount} row${rowCount === 1 ? "" : "s"} queued for ingestion.` });
+      setRefreshSignal((s) => s + 1);
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
@@ -171,6 +171,14 @@ export default function IngestionPage() {
             <p className="mt-3 text-xs text-muted-foreground/50 uppercase tracking-widest">
               — or click to browse —
             </p>
+            <a
+              href="/aonex-catalog-template.csv"
+              download
+              onClick={(e) => e.stopPropagation()}
+              className="mt-4 inline-block text-xs font-medium text-primary underline underline-offset-2"
+            >
+              Download CSV template
+            </a>
           </div>
         </div>
 
