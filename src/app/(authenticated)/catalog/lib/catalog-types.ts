@@ -24,6 +24,8 @@ export interface ListCatalogProductRow {
   brand: string | null;
   /** Projected from winning_values.gtin._unscoped._unscoped.value */
   gtin: string | null;
+  /** Projected from winning_values.category_path; null when uncategorised. */
+  category: string | null;
   /** Always null for new-schema rows (legacy concept removed). */
   current_version: null;
   /** Always [] for new-schema rows (variants deferred per Phase 7). */
