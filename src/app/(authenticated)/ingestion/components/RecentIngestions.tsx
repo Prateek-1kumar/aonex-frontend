@@ -198,6 +198,10 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
           (item.status === "completed" || item.status === "needs_review") &&
           skuState === undefined;
         const summary = skuState ? summarizeSku(skuState) : null;
+        const isCsv = item.source_type === "templated_csv";
+        const primaryLabel = isCsv
+          ? (item.filename ?? "CSV upload")
+          : (summary?.title ?? shortUrl(item.final_url));
 
         return (
           <button
@@ -227,7 +231,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
               <div className="flex items-center gap-2">
                 <div className={`size-1.5 rounded-full ${tone.dot}`} />
                 <p className="text-sm font-semibold text-foreground/95 truncate">
-                  {summary?.title ?? shortUrl(item.final_url)}
+                  {primaryLabel}
                 </p>
               </div>
 
@@ -240,8 +244,8 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                 {(summary?.brand || summary?.category) && (
                   <span className="text-muted-foreground/40">·</span>
                 )}
-                <span className="font-mono truncate" title={item.final_url}>
-                  {shortUrl(item.final_url)}
+                <span className="font-mono truncate" title={isCsv ? (item.filename ?? "CSV upload") : item.final_url}>
+                  {isCsv ? (item.filename ?? "CSV upload") : shortUrl(item.final_url)}
                 </span>
               </div>
 
@@ -269,6 +273,11 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                     {item.cost_credits}c
                   </span>
                 )}
+                {isCsv && item.error_count ? (
+                  <span className="normal-case tracking-normal tabular-nums text-rose-300/70">
+                    {item.error_count} row issue{item.error_count === 1 ? "" : "s"}
+                  </span>
+                ) : null}
                 {isLoadingSku && (
                   <span className="flex items-center gap-1 normal-case tracking-normal text-muted-foreground/45">
                     <Loader2 size={10} className="animate-spin" />

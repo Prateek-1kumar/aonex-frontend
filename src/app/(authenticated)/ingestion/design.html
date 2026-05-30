@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aonex Ingestion Platform — High-Level Design (HLD)</title>
+    <style>
+        :root {
+            --bg-color: #f9fafb;
+            --text-color: #374151;
+            --heading-color: #111827;
+            --accent-color: #2563eb;
+            --border-color: #e5e7eb;
+            --code-bg: #1e293b;
+            --code-text: #f8fafc;
+            --inline-code-bg: #f1f5f9;
+            --inline-code-text: #b91c1c;
+            --quote-bg: #eff6ff;
+            --quote-border: #3b82f6;
+            --table-header: #f3f4f6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h1, h2, h3, h4 {
+            color: var(--heading-color);
+            margin-top: 2em;
+            margin-bottom: 0.75em;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3rem;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+        }
+
+        p, ul, ol, table, pre, blockquote {
+            margin-bottom: 1.25rem;
+        }
+
+        ul, ol {
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        blockquote {
+            background-color: var(--quote-bg);
+            border-left: 4px solid var(--quote-border);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            color: #1e3a8a;
+            border-radius: 0 0.5rem 0.5rem 0;
+        }
+
+        blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-size: 0.9em;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background-color: var(--inline-code-bg);
+            color: var(--inline-code-text);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+        }
+
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: white;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--table-header);
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: var(--border-color);
+            margin: 3rem 0;
+        }
+
+        /* Fixed Mermaid container for better SVG scaling */
+        .mermaid {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            margin: 2rem 0;
+            text-align: center; /* Safer than flexbox for print */
+            overflow-x: auto;
+        }
+        
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* --- PRINT SPECIFIC STYLES FOR PDF EXPORT --- */
+        @media print {
+            body {
+                background-color: white;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+                font-size: 10.5pt;
+            }
+
+            /* Prevent elements from breaking across pages */
+            pre, blockquote, table, tr, th, td {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            /* Mermaid SVG Print Fixes */
+            .mermaid {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin: 1.5rem 0;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                overflow: visible !important; /* Never use scrollbars in print */
+            }
+
+            /* Force SVGs to scale properly and not create massive empty bounds */
+            .mermaid svg {
+                max-width: 100% !important;
+                height: auto !important;
+                display: block;
+                margin: 0 auto;
+            }
+
+            /* Keep headings with their following paragraphs */
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+
+            /* Force page breaks before major sections */
+            h1.part-header {
+                page-break-before: always;
+                break-before: page;
+                margin-top: 0;
+            }
+
+            /* Soften UI shadows for print */
+            pre, table {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+
+            /* Ensure background colors print correctly if enabled by user */
+            blockquote {
+                border-left: 4px solid #3b82f6 !important;
+                background-color: #eff6ff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+<body>
+
+    <h1>Aonex Ingestion Platform — High-Level Design (HLD)</h1>
+
+    <blockquote>
+        <p><strong>Purpose.</strong> The single reference for the Aonex ingestion platform: what it is, how it is constructed today (with the real schemas and contracts), every decision gate, and the target design after the −1→4 roadmap. Written to be <strong>presented</strong>: Part 0 is the exec/diagram layer for any room; Parts 1–2 are the deep technical layer (verbatim DDL + TypeScript contracts); Part 3 is the end-state design; Part 4 is reference.</p>
+        <p><strong>Companions:</strong> build contract → <code>docs/superpowers/specs/2026-05-27-ingestion-platform-redesign-design.md</code>; per-phase implementation plans → <code>docs/superpowers/plans/2026-05-27-phase-*.md</code>.</p>
+        <p>Status: living HLD · Last updated 2026-05-27 · Schemas verbatim from <code>aonex-backend/packages/db/migrations</code> + <code>packages/catalog/source-adapters</code>.</p>
+    </blockquote>
+
+    <h2>How to present this</h2>
+    <ul>
+        <li><strong>Slides 1–6 (Part 0):</strong> what/why, architecture diagram, journey diagram, before→after. Any audience.</li>
+        <li><strong>Slides 7–12 (Parts 1–2):</strong> the canonical data model, the adapter contract, the stage-by-stage flow, the gate reference. Engineering deep-dive.</li>
+        <li><strong>Diagram deck (§8A):</strong> present the gate-by-gate diagrams in sequence — master flow → fetch ladder → extraction waterfall → identity decision tree → readiness AND-gate → identity freeze state machine → Lab triage. One diagram per slide makes the "logic gates" land visually.</li>
+        <li><strong>Slides 13–18 (Part 3):</strong> the four pillars, the target gate diagrams (§12A: completeness gate, strong-key-or-Lab, backfill promotion, product state machine), end-state schemas, SLOs. The "where we're going" story.</li>
+        <li><strong>Rendering:</strong> all diagrams are Mermaid (live in GitHub/Notion/reveal.js/VS Code preview). For PowerPoint/Google Slides, paste each block into mermaid.live and export PNG/SVG.</li>
+    </ul>
+
+    <hr>
+
+    <h1 class="part-header">PART 0 — Executive layer</h1>
+
+    <h2>1. What Aonex is</h2>
+    <p>Aonex is a multi-marketplace <strong>product-catalog ingestion & distribution platform</strong>. A client hands us product data from wherever it lives — a marketplace URL, a CSV export, or a live store connector (Shopify, eBay) — and we turn messy, inconsistent, multi-source reality into <strong>one clean, deduplicated, trustworthy catalog</strong> the client can distribute to any channel.</p>
+    <p>The four hard problems we solve: <strong>extract</strong> correct fields from any source; <strong>resolve identity</strong> (is this the same physical product we already have, from another marketplace?); <strong>decide readiness</strong> (is it complete and trustworthy enough to publish?); and give <strong>humans the tools</strong> to finish what the machine can't.</p>
+
+    <h2>2. The bet (one slide)</h2>
+    <p><strong>Permissive intake, strict publish — on a GTIN/identity spine.</strong> Accept almost anything; resolve identity aggressively (backfilling the universal GTIN key); score completeness against what the product's <em>type</em> needs; gate only at publish; auto-merge <strong>only</strong> on a strong, corroborated key (everything else is a human-confirmed proposal). Today the system does the opposite (strict 5-field intake gate, identity that only fires when a GTIN happens to be present) — which is why incomplete-but-valid products dead-end and the same product duplicates across marketplaces.</p>
+
+    <h2>3. Architecture at a glance</h2>
+    <div class="mermaid">
+flowchart LR
+  subgraph Sources
+    L[Link / URL]:::s
+    C[CSV upload]:::s
+    K[Connector\nShopify / eBay via Nango]:::s
+  end
+  L --> FETCH[Fetch escalation\nstatic → browser → unblock]
+  FETCH --> EXTRACT[Extraction layers\nper-site → structured → DOM → LLM → vision]
+  C --> ADAPT[Source adapter\n→ AdapterOutput]
+  K --> ADAPT
+  EXTRACT --> ADAPT
+  ADAPT --> MAP[Semantic mapper\nrawKey → canonical path]
+  MAP --> IDENT[Identity resolver\nGTIN / MPN+brand / SKU / fuzzy]
+  IDENT --> GATE[Readiness gate\nCANONICAL_MINIMUM]
+  GATE -->|admit| WRITE[Catalog write\nobservations → winning_values]
+  GATE -->|fail / ambiguous| LAB[Anomaly Lab\nhuman triage]
+  LAB --> WRITE
+  WRITE --> RECON[Reconciler\n+ identity policy]
+  RECON --> CAT[(catalog_products\ngolden record)]
+  classDef s fill:#1e293b,color:#fff;
+    </div>
+
+    <h2>4. The product journey at a glance</h2>
+    <div class="mermaid">
+flowchart TD
+  A[Source record] --> B{Link?}
+  B -->|yes| F[Fetch + extract facts] --> M
+  B -->|no CSV/connector| M[Normalize → AdapterOutput]
+  M --> R[Resolve identity\nagainst catalog]
+  R --> G{Readiness gate\n+ policy detectors}
+  G -->|complete & confident| P[Promote → catalog]
+  G -->|incomplete / ambiguous| H[Anomaly Lab\nfill / link / reject]
+  H -->|fixed| P
+  P --> W[Reconcile winning_values\n+ guard identity]
+    </div>
+
+    <h2>5. Before → after (the end-state in one table)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Dimension</th>
+                <th>Today</th>
+                <th>After phases −1→4</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Unknown site</td>
+                <td>per-site parser or bust</td>
+                <td>generic LLM/vision schema-guided extractor</td>
+            </tr>
+            <tr>
+                <td>Readiness</td>
+                <td>binary 5-field AND-gate</td>
+                <td>weighted completeness % per archetype × channel</td>
+            </tr>
+            <tr>
+                <td>Missing price</td>
+                <td>hard, non-fillable block</td>
+                <td>fillable in the Lab; or scored-incomplete</td>
+            </tr>
+            <tr>
+                <td>Product types</td>
+                <td>one schema for all</td>
+                <td>archetypes with tiered, weighted attributes</td>
+            </tr>
+            <tr>
+                <td>Same product, N sources</td>
+                <td>up to N duplicates</td>
+                <td>one golden record (GTIN-backfilled, match-on-strong-key)</td>
+            </tr>
+            <tr>
+                <td>No identifier</td>
+                <td>dead end</td>
+                <td><code>identifier_exists=false</code> escape hatch</td>
+            </tr>
+            <tr>
+                <td>Source URL</td>
+                <td>hidden ingestion metadata</td>
+                <td>first-class, displayed attribute</td>
+            </tr>
+            <tr>
+                <td>Reviews</td>
+                <td>scalar avg per channel</td>
+                <td>normalized records, deduped, cross-source aggregated</td>
+            </tr>
+            <tr>
+                <td>Confidence</td>
+                <td>arbitrary constants</td>
+                <td>calibrated against a labeled eval (isotonic)</td>
+            </tr>
+            <tr>
+                <td>Quality</td>
+                <td>unmeasured</td>
+                <td>north metric (auto-promote precision) gated in CI</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h1 class="part-header">PART 1 — Core concepts (shared)</h1>
+
+    <h2>6. The canonical data model — observations & the golden record</h2>
+    <p>The heart of the system is that <strong>we never store "the price is ₹79,999."</strong> We store <em>"source <code>croma:link</code> observed price ₹79,999 at time T with confidence 0.93."</em> Every attribute is an append-only stream of <strong>observations</strong>; the displayed value (<code>winning_values</code>) is <em>reconciled</em> from those observations by explicit source-priority rules. This is a golden-record / MDM model.</p>
+
+    <h3>6.1 <code>catalog_products</code> — the product row (verbatim DDL)</h3>
+    <p>Source: <code>packages/db/migrations/0008_chilly_bulldozer.sql</code></p>
+    <pre><code class="language-sql">CREATE TABLE "catalog_products" (
+  "product_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "tenant_id" uuid NOT NULL,
+  "merchant_id" uuid NOT NULL,
+  "parent_product_id" uuid,
+  "primary_identifier" text NOT NULL,
+  "identity" jsonb NOT NULL,
+  "family" text,                       -- archetype key (dormant today; wired in Phase 1)
+  "status" text DEFAULT 'draft' NOT NULL,
+  "merged_into_product_id" uuid,       -- set when this row is merged into another
+  "values" jsonb DEFAULT '{}'::jsonb NOT NULL,        -- 4-axis observation store (§6.2)
+  "winning_values" jsonb,              -- reconciled, displayed values (§6.3)
+  "winning_values_shadow" jsonb,       -- shadow reconciliation for safe rollout
+  "current_revision_id" bigint,
+  "schema_version" text DEFAULT '1' NOT NULL,         -- already present; used by Phase 3
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT "uq_catalog_products_tenant_identifier" UNIQUE("tenant_id","primary_identifier")
+);
+CREATE INDEX "idx_catalog_products_parent"        ON "catalog_products" ("parent_product_id");
+CREATE INDEX "idx_catalog_products_tenant_status" ON "catalog_products" ("tenant_id","status");
+CREATE INDEX "idx_catalog_products_family"        ON "catalog_products" ("family");</code></pre>
+
+    <h3>6.2 The 4-axis <code>values</code> JSONB (how every field is constructed)</h3>
+    <p><code>values</code> is keyed <strong><code>[attributeCode][channel|_unscoped][locale|_unscoped] → Observation[]</code></strong>. Channel-agnostic attributes (identity fields) use the <code>_unscoped</code> sentinel on both axes.</p>
+    <pre><code class="language-json">// catalog_products.values
+{
+  "title": {
+    "croma": { "en": [
+      { "source": "croma:link", "source_record_id": "8c276b68…",
+        "value": "Google Pixel 10 5G (12GB, 256GB, Obsidian)", "confidence": 0.95,
+        "observed_at": "2026-05-26T10:25:00Z" }
+    ]}
+  },
+  "brand": {
+    "_unscoped": { "_unscoped": [
+      { "source": "croma:link", "value": "Google", "confidence": 0.90, "observed_at": "…" }
+    ]}
+  }
+}</code></pre>
+    <p>A per-leaf <strong>observation cap</strong> retains the newest N (revisited in Phase 1); evicted rows spill into the revision log (§9.3).</p>
+
+    <h3>6.3 <code>winning_values</code> — the reconciled display layer</h3>
+    <p>The reconciler picks one winner per attribute (per scope) into <code>winning_values</code>. Its exact shape is pinned by the <strong>generated columns</strong> (verbatim, <code>0009_…generated_columns.sql</code>):</p>
+    <pre><code class="language-sql">ALTER TABLE catalog_products
+  ADD COLUMN gen_brand TEXT            GENERATED ALWAYS AS (identity->>'brand') STORED,
+  ADD COLUMN gen_gtin  TEXT            GENERATED ALWAYS AS (identity->>'gtin')  STORED,
+  ADD COLUMN gen_primary_currency TEXT GENERATED ALWAYS AS (winning_values #>> '{pricing,_primary,currency}') STORED,
+  ADD COLUMN gen_primary_price NUMERIC GENERATED ALWAYS AS ((winning_values #>> '{pricing,_primary,tiers,0,amount}')::numeric) STORED,
+  ADD COLUMN gen_inventory_total INT   GENERATED ALWAYS AS ((winning_values #>> '{inventory,_primary,total}')::int) STORED,
+  ADD COLUMN gen_title TEXT            GENERATED ALWAYS AS (winning_values #>> '{title,_primary,value}') STORED;
+
+CREATE INDEX idx_catalog_products_gen_brand ON catalog_products (gen_brand) WHERE gen_brand IS NOT NULL;
+CREATE INDEX idx_catalog_products_gen_gtin  ON catalog_products (gen_gtin)  WHERE gen_gtin  IS NOT NULL;
+CREATE INDEX idx_catalog_products_gen_brand_price ON catalog_products (gen_brand, gen_primary_price);
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_catalog_products_gen_title_trgm ON catalog_products USING GIN (gen_title gin_trgm_ops);
+CREATE INDEX idx_catalog_products_values_gin     ON catalog_products USING GIN (values);</code></pre>
+    <p>So <code>winning_values</code> looks like:</p>
+    <pre><code class="language-json">{
+  "title":     { "_primary": { "value": "Google Pixel 10 5G …", "source": "croma:link", "confidence": 0.95 } },
+  "pricing":   { "_primary": { "currency": "INR", "tiers": [ { "amount": 79999 } ] } },
+  "inventory": { "_primary": { "total": 12 } }
+}</code></pre>
+    <p>Identity (gtin/brand) lives in the separate <code>identity</code> JSONB, projected to <code>gen_brand</code>/<code>gen_gtin</code> for indexed search; price/inventory winners are denormalized into side tables (§9.4–9.5).</p>
+
+    <h2>7. Source adapters & the <code>AdapterOutput</code> contract</h2>
+    <p>Every intake path (<code>link</code>, <code>csv</code>, <code>connector</code>) emits the <strong>same</strong> normalized <code>AdapterOutput</code>. Everything downstream is source-agnostic. Verbatim from <code>packages/catalog/source-adapters/src/types.ts</code>:</p>
+    <pre><code class="language-typescript">export interface AdapterOutput {
+  observations:           CanonicalObservation[];
+  pricingObservations:    PricingObservation[];
+  inventoryObservations:  InventoryObservation[];
+  identityHint:           IdentityHint;
+  rawPayload:             unknown;
+}
+
+export interface CanonicalObservation {
+  attributeCode:   string;
+  target:          "parent" | "variant";
+  variantAxes?:    Record&lt;string, string&gt;;
+  channelCode:     string;
+  localeCode:      string;
+  source:          string;
+  sourceRecordId:  string;
+  value:           unknown;
+  confidence:      number;
+  observedAt:      Date;
+  extras?:         Record&lt;string, unknown&gt;;
+}
+
+export interface IdentityHint {
+  gtin?:           string;
+  mpn?:            string;
+  primary_identifier?: string;   // merchant SKU (CSV); hard ID within the tenant
+  brand?:          string;
+  model_number?:   string;
+  titleForFuzzy?:  string;
+  variantAxes?:    Record&lt;string, string&gt;;
+  targetIsVariant: boolean;
+}
+// PricingObservation: { productHint, channelCode, locale, source, currency,
+//   tiers: [{ kind, amount?, total? }], pricePerUnit?, observedAt, ... }
+// InventoryObservation: { productHint, channelCode, locationId?, qty,
+//   clickCollectEligible?, purchaseLimit?, backorderAllowed?, source, observedAt }</code></pre>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Adapter</th>
+                <th><code>identityHint</code> it sets</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Link</td>
+                <td><code>source-adapters/src/link</code></td>
+                <td><code>gtin</code>/<code>mpn</code>/<code>brand</code> if extracted; <code>titleForFuzzy</code></td>
+                <td>fetch + extract pipeline feeds this</td>
+            </tr>
+            <tr>
+                <td>CSV</td>
+                <td><code>source-adapters/src/csv</code></td>
+                <td><code>primary_identifier</code> (merchant SKU)</td>
+                <td>self-keyed within tenant</td>
+            </tr>
+            <tr>
+                <td>Connector</td>
+                <td><code>shopify-connector</code> + <code>connector-gateway</code> (Nango)</td>
+                <td>connector-native ids + <code>brand</code></td>
+                <td>Shopify/eBay wired; Amazon partial</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h1 class="part-header">PART 2 — Current system HLD (deep technical)</h1>
+
+    <h2>8. Stage-by-stage data flow (link path, the most complex)</h2>
+
+    <h3>Stage 1 — Fetch escalation (<code>packages/link-adapter/src/fetch-escalation.ts</code>)</h3>
+    <p>Static HTTP → headless browser (<code>ingestion-browser-fallback</code>) if <em>anemic</em> (HTML &lt; ~5 KB, anti-bot markers, or missing structured data) → unblock vendor (<code>ingestion-antibot-vendor</code>, ScrapingBee) within a per-URL cost ceiling.</p>
+
+    <h3>Stage 2 — Extraction layers (<code>packages/link-adapter/src/extract-layers.ts</code>)</h3>
+    <p>Priority-ordered; each emits <code>ExtractedFact[]</code>:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Layer</th>
+                <th>What</th>
+                <th>Conf</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>G — Per-site parser</td>
+                <td>Croma/Amazon/Walmart/BestBuy/eBay</td>
+                <td>0.80–1.0</td>
+            </tr>
+            <tr>
+                <td>A — Structured</td>
+                <td>JSON-LD, microdata, OpenGraph, Next/Nuxt/Shopify/Woo/Magento</td>
+                <td>~0.95</td>
+            </tr>
+            <tr>
+                <td>B — DOM heuristics</td>
+                <td><code>itemprop</code>/class-name price, title, images, breadcrumb</td>
+                <td>0.65–0.9</td>
+            </tr>
+            <tr>
+                <td>C — LLM gap-fill</td>
+                <td>fills only still-missing fields</td>
+                <td>~0.7</td>
+            </tr>
+            <tr>
+                <td>F — Vision</td>
+                <td>screenshot → vision model</td>
+                <td>~0.70</td>
+            </tr>
+        </tbody>
+    </table>
+    <p><strong><code>ExtractedFact</code></strong> (verbatim, <code>packages/ingestion/field-extractor/src/types.ts</code>):</p>
+    <pre><code class="language-typescript">export interface ExtractedFact {
+  rawKey: string;
+  canonicalPath: string | null;        // null until the Semantic Mapper assigns it
+  extractedValue: unknown;
+  normalizedValue: unknown;
+  unit: string | null;
+  sourcePointer: string;               // JSONPath into raw_data, e.g. "$.variants[0].barcode"
+  extractionMethod: "direct" | "computed" | "inferred";
+  confidence: number;                  // 0..1, value correctness
+  mappingMethod: string | null;
+  mappingCandidates: Array&lt;{ key: string; score: number; reason?: string }&gt; | null;
+  sourceAlternatives: Array&lt;{ value: unknown; sourcePointer: string; confidence: number }&gt; | null;
+  approved: boolean;
+}</code></pre>
+
+    <h3>Stage 3 — Semantic mapper (<code>packages/ingestion/semantic-mapper</code>)</h3>
+    <p><code>rawKey → canonicalPath</code> with a mapping score (channel-exact 0.40, synonym 0.18, type 0.10, unit 0.07, category 0.06, embedding 0.15 <em>stubbed</em>, tenant-override 0.04). Thresholds: ≥0.55 auto · 0.40–0.55 suggestion · &lt;0.25 unmapped.</p>
+
+    <h3>Stage 4 — Identity resolution (<code>catalog-service/src/identity-resolver.ts</code>)</h3>
+    <p>GTIN exact (1.0) → MPN+brand exact (0.9) → merchant SKU exact-or-none (1.0, skips fuzzy) → fuzzy brand+title via <code>multi-source-reconciler</code> (≥0.7 auto / 0.5–0.7 review / else new).</p>
+
+    <h3>Stage 5 — Readiness gate (<code>catalog-service/src/gate/evaluate-gate.ts</code>)</h3>
+    <p><code>CANONICAL_MINIMUM</code> (verbatim, <code>canonical-minimum.ts</code>):</p>
+    <pre><code class="language-typescript">export const CANONICAL_MINIMUM = [
+  "title", "brand", "pricing.primary", "category_path", "identifier"
+] as const;  // identifier = gtin OR mpn OR primary_identifier; price is non-fillable in v1</code></pre>
+    <p><code>admit = all five present AND no blocking signal</code>.</p>
+
+    <h3>Stage 6 — Policy detectors (<code>packages/ingestion/policy-engine/router.ts</code>)</h3>
+    <p>Nine detectors (low-confidence-mapping, missing-required-attribute, field-conflict, unit-conflict, potential-duplicate, category-ambiguous, variant-incomplete, price-anomaly, value-contradiction) → any blocking signal routes to review.</p>
+
+    <h3>Stage 7 — Admit or stage (<code>admit-or-stage.ts</code>)</h3>
+    <p>Admit → catalog write. Fail/ambiguous → <code>staged_products</code> (the Lab queue).</p>
+
+    <h3>Stage 8 — Anomaly Lab (<code>aonex-frontend/.../ingestion/anomaly-lab</code>, API <code>apps/api/.../anomaly-lab.ts</code>)</h3>
+    <p>Reviewer fills <code>title</code>/<code>brand</code>/<code>category_path</code>/<code>identifier</code> (<strong>price NOT fillable today</strong>), re-runs the gate, promotes; or links to an existing product (skips the gate); or rejects.</p>
+
+    <h3>Stage 9 — Catalog write + reconciliation + identity policy</h3>
+    <p><code>catalog-write.ts</code> appends observations into <code>values</code>; the reconciler computes <code>winning_values</code>; <code>identity-policy.ts</code> guards identity mutations (strength&lt;0.7 freeze; gtin/mpn conflict freeze; brand needs 3 consecutive priority-1 obs; auto-unfreeze after 5).</p>
+
+    <h2>8A. Visual walkthrough — the pipeline & every logic gate</h2>
+    <p><strong>The whole flow, gate by gate</strong> (diamonds = the numbered logic gates from §10):</p>
+    <div class="mermaid">
+flowchart TD
+  IN[Source record] --> G1{Gate 1 Fetch<br/>anemic response}
+  G1 -->|static OK| EX[Extract facts]
+  G1 -->|anemic| BR[Browser then unblock] --> EX
+  EX --> G3{Gate 3 Mapping<br/>score}
+  G3 -->|"auto ≥0.55 or suggest"| ID{Gate 4 Identity<br/>match}
+  G3 -->|"unmapped below 0.25"| UNM[field dropped]
+  ID -->|matched or new| G5{Gate 5 Readiness<br/>all 5 fields}
+  G5 -->|all present| G6{Gate 6 Policy<br/>blocking signal}
+  G5 -->|missing| LAB[Anomaly Lab]
+  G6 -->|none| W[Catalog write]
+  G6 -->|blocking| LAB
+  LAB -->|fixed| W
+  LAB -->|reject| X[Rejected]
+  W --> G7{Gate 7 Identity policy}
+  G7 -->|"strength ≥0.7 no conflict"| AP[Apply identity update]
+  G7 -->|low or conflict| FZ[Freeze and review task]
+    </div>
+
+    <p><strong>Gate 1 — fetch escalation ladder:</strong></p>
+    <div class="mermaid">
+flowchart LR
+  U[URL] --> S[Static HTTP fetch]
+  S --> Q1{anemic<br/>under 5KB or anti-bot or no structured data}
+  Q1 -->|no| DONE[Use HTML]
+  Q1 -->|yes| B[Headless browser render]
+  B --> Q2{still anemic}
+  Q2 -->|no| DONE
+  Q2 -->|"yes and budget left"| V[Unblock vendor]
+  Q2 -->|budget exceeded| PART[Best-effort partial]
+  V --> DONE
+    </div>
+
+    <p><strong>Gate 2 — extraction layers waterfall</strong> (per-field confidence assigned here):</p>
+    <div class="mermaid">
+flowchart TD
+  H[Rendered HTML] --> G[Layer G per-site parser]
+  H --> A[Layer A structured JSON-LD microdata OG]
+  H --> B[Layer B DOM heuristics]
+  G --> M[Merge facts by priority]
+  A --> M
+  B --> M
+  M --> C{fields still missing}
+  C -->|no| OUT[ExtractedFact set]
+  C -->|yes| L[Layer C LLM gap-fill]
+  L --> Vq{price missing and low fact count}
+  Vq -->|no| OUT
+  Vq -->|yes| VIS[Layer F vision]
+  VIS --> OUT
+    </div>
+
+    <p><strong>Gate 4 — identity resolution decision tree</strong> (the thresholds, top to bottom):</p>
+    <div class="mermaid">
+flowchart TD
+  I[identityHint plus title] --> Q1{GTIN exact match}
+  Q1 -->|yes| M1[Match strength 1.0]
+  Q1 -->|no| Q2{MPN plus brand exact}
+  Q2 -->|yes| M2[Match strength 0.9]
+  Q2 -->|no| Q3{merchant SKU set}
+  Q3 -->|exact hit| M3[Match 1.0]
+  Q3 -->|no hit| NEW[Create new skip fuzzy]
+  Q3 -->|absent| Q4[Fuzzy score brand plus title]
+  Q4 --> Q5{composite score}
+  Q5 -->|"≥0.7"| M4[Auto-merge]
+  Q5 -->|"0.5 to 0.7"| REV[Review task no merge]
+  Q5 -->|below 0.5| NEW2[Create new]
+    </div>
+
+    <p><strong>Gate 5 — the readiness gate is a binary AND</strong> (this rigidity is the core diagnosis):</p>
+    <div class="mermaid">
+flowchart TD
+  O[AdapterOutput] --> T{title}
+  T -->|no| S[Stage to Lab]
+  T -->|yes| BR{brand}
+  BR -->|no| S
+  BR -->|yes| PR{pricing.primary}
+  PR -->|no| S
+  PR -->|yes| CT{category_path}
+  CT -->|no| S
+  CT -->|yes| IDf{identifier gtin mpn or sku}
+  IDf -->|no| S
+  IDf -->|yes| PS{blocking policy signal}
+  PS -->|yes| S
+  PS -->|no| ADMIT[Admit to catalog]
+    </div>
+
+    <p><strong>Gate 7 — identity-policy freeze/unfreeze state machine:</strong></p>
+    <div class="mermaid">
+stateDiagram-v2
+  [*] --> active
+  active --> frozen_pending_review: gtin or mpn conflict, or strength below 0.7
+  frozen_pending_review --> active: 5 consecutive priority-1 matches
+  active --> merged: merged into another product
+  merged --> [*]
+    </div>
+
+    <p><strong>Anomaly Lab triage flow</strong> (today: price is NOT fillable):</p>
+    <div class="mermaid">
+flowchart TD
+  Q[Staged item] --> R[Reviewer opens]
+  R --> D{action}
+  D -->|Approve| F[Fill title brand category identifier] --> RG{re-run gate passes}
+  RG -->|yes| P[Promote to catalog]
+  RG -->|no| Q
+  D -->|Link| LK[Attach to existing product skip gate]
+  D -->|Reject| X[Rejected terminal]
+  D -->|Skip| Q
+    </div>
+
+    <h2>9. Full schema reference (verbatim DDL)</h2>
+
+    <h3>9.1 <code>staged_products</code> — the Lab queue (<code>0022_staged_products.sql</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE staged_products (
+  staged_product_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id          UUID NOT NULL,
+  merchant_id        UUID NOT NULL,
+  proposed_identity  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  observations       JSONB NOT NULL,          -- the serialized AdapterOutput
+  denorm_title       TEXT,
+  denorm_brand       TEXT,
+  denorm_price       NUMERIC,
+  denorm_currency    TEXT,
+  source_kind        TEXT NOT NULL,
+  source_artifact_id UUID,
+  channel_code       TEXT,
+  gate_verdict       JSONB NOT NULL,          -- { missingFields[], signals[] }
+  match_candidates   JSONB NOT NULL DEFAULT '[]'::jsonb,
+  human_fills        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status             TEXT NOT NULL DEFAULT 'pending',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_by        UUID,
+  resolved_at        TIMESTAMPTZ,
+  CONSTRAINT staged_products_status_chk CHECK (status IN ('pending','promoted','rejected'))
+);
+CREATE INDEX idx_staged_products_tenant_status_created ON staged_products (tenant_id, status, created_at);
+CREATE INDEX idx_staged_products_gate_verdict_gin       ON staged_products USING GIN (gate_verdict);</code></pre>
+
+    <h3>9.2 <code>source_priority</code> — who wins per attribute (<code>0013_source_priority.sql</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE source_priority (
+  rule_id        BIGSERIAL PRIMARY KEY,
+  tenant_id      UUID,            -- NULL = global default
+  attribute_code TEXT,            -- NULL = all attributes
+  source_glob    TEXT NOT NULL,
+  channel_scope  TEXT,
+  priority       INTEGER NOT NULL,
+  predicate      JSONB,           -- conditional rules (v2)
+  rules_version  INT NOT NULL,
+  effective_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+  effective_to   TIMESTAMPTZ,     -- NULL = in force
+  actor          TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_source_priority_lookup
+  ON source_priority (tenant_id, attribute_code, source_glob, channel_scope)
+  WHERE effective_to IS NULL;     -- partial index over ACTIVE rules</code></pre>
+
+    <h3>9.3 <code>catalog_product_revisions</code> — append-only audit (<code>0010_…</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE catalog_product_revisions (
+  revision_id              BIGSERIAL,
+  product_id               UUID NOT NULL,
+  tenant_id                UUID NOT NULL,
+  values_snapshot          JSONB NOT NULL,
+  winning_snapshot         JSONB,
+  diff                     JSONB,
+  revision_reason          TEXT NOT NULL,
+  source_kind              TEXT,
+  source_record_id         TEXT,
+  triggered_by_artifact_id UUID,
+  raw_payload              JSONB,
+  observed_at              TIMESTAMPTZ,
+  ingested_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actor                    TEXT,
+  suppress_outbound        BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (revision_id, ingested_at)
+) PARTITION BY RANGE (ingested_at);    -- monthly partitions; UPDATE/DELETE blocked by trigger</code></pre>
+
+    <h3>9.4 Pricing — observations + current (<code>0011_catalog_pricing.sql</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE catalog_pricing_observations (
+  observation_id BIGSERIAL, product_id UUID NOT NULL, tenant_id UUID NOT NULL,
+  channel_id UUID NOT NULL REFERENCES channels(channel_id),
+  locale TEXT NOT NULL DEFAULT '_unscoped', source TEXT NOT NULL, source_record_id TEXT,
+  currency TEXT NOT NULL, tiers JSONB NOT NULL, price_per_unit JSONB,
+  observed_at TIMESTAMPTZ NOT NULL, ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  artifact_id UUID, extras JSONB, merged_from_product_id UUID,
+  PRIMARY KEY (observation_id, observed_at)
+) PARTITION BY RANGE (observed_at);
+
+CREATE TABLE catalog_pricing_current (   -- app-maintained by the reconciler, not a trigger
+  product_id UUID NOT NULL, channel_id UUID NOT NULL, locale TEXT NOT NULL DEFAULT '_unscoped',
+  source TEXT NOT NULL, currency TEXT NOT NULL, tiers JSONB NOT NULL, price_per_unit JSONB,
+  primary_amount NUMERIC, observed_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (product_id, channel_id, locale)
+);</code></pre>
+
+    <h3>9.5 Inventory — observations + current (<code>0012_catalog_inventory.sql</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE catalog_inventory_observations (
+  observation_id BIGSERIAL, product_id UUID NOT NULL, tenant_id UUID NOT NULL,
+  channel_id UUID NOT NULL REFERENCES channels(channel_id),
+  location_id UUID REFERENCES inventory_locations(location_id),
+  qty INTEGER NOT NULL CHECK (qty >= 0), click_collect_eligible BOOLEAN, purchase_limit INTEGER,
+  backorder_allowed BOOLEAN, source TEXT NOT NULL, source_record_id TEXT,
+  observed_at TIMESTAMPTZ NOT NULL, ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(), artifact_id UUID,
+  PRIMARY KEY (observation_id, observed_at)
+) PARTITION BY RANGE (observed_at);
+
+CREATE TABLE catalog_inventory_current (
+  product_id UUID NOT NULL, channel_id UUID NOT NULL, location_id UUID,
+  location_id_coalesced UUID GENERATED ALWAYS AS
+    (COALESCE(location_id,'00000000-0000-0000-0000-000000000000'::uuid)) STORED,
+  qty INTEGER NOT NULL, source TEXT NOT NULL, observed_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (product_id, channel_id, location_id_coalesced)
+);</code></pre>
+
+    <h3>9.6 <code>identity_log</code> — identity audit (<code>0014_identity_log.sql</code>)</h3>
+    <pre><code class="language-sql">CREATE TABLE identity_log (
+  log_id BIGSERIAL PRIMARY KEY, product_id UUID NOT NULL REFERENCES catalog_products(product_id),
+  tenant_id UUID NOT NULL, identity_field TEXT NOT NULL,   -- gtin|mpn|brand|model_number
+  old_value TEXT, new_value TEXT, source TEXT NOT NULL, source_record_id TEXT,
+  observed_at TIMESTAMPTZ NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now(), rationale TEXT
+);</code></pre>
+
+    <h3>9.7 <code>review_tasks</code> — content-quality flags (NOT customer reviews) (<code>schema/review.ts</code>)</h3>
+    <pre><code class="language-typescript">reviewTasks = pgTable("review_tasks", {
+  id, tenantId, merchantId, proposedDiffId?, artifactId?,
+  taskType,        // "category_unmatched" | "low_confidence" | "dedupe_conflict" | "schema_violation"
+  signalKind?, signalPayload?, clusterKey?, fieldName?,
+  severity,        // low | medium | high | critical
+  status,          // open | in_progress | resolved | dismissed
+  assignedTo?, resolutionNotes?, policyVersionId?, createdAt, updatedAt
+});</code></pre>
+    <blockquote>
+        <p><strong>Note (a current gap):</strong> customer ratings are captured only as a scalar <code>{average, count}</code> observation per channel — there is <strong>no</strong> normalized review-record table. Fixed in Phase 4 (§13.4).</p>
+    </blockquote>
+
+    <h2>10. Logic-gate reference</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Gate</th>
+                <th>Where</th>
+                <th>Threshold / rule</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Fetch escalation</td>
+                <td><code>link-adapter/fetch-escalation.ts</code></td>
+                <td>anemic if &lt; 5 KB / anti-bot marker / no structured data</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Field confidence</td>
+                <td><code>ingestion-spine/.../persist-diff-fields.ts</code></td>
+                <td>per-field = max(fact conf); fallback 0.6; auto-approve ≥ 0.9</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>Semantic mapping</td>
+                <td><code>semantic-mapper/pipeline/scorer.ts</code></td>
+                <td>≥0.55 auto · 0.40–0.55 suggest · &lt;0.25 unmapped</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Identity resolution</td>
+                <td><code>identity-resolver.ts</code></td>
+                <td>GTIN 1.0 · MPN+brand 0.9 · SKU exact · fuzzy ≥0.7 merge / 0.5–0.7 review</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Readiness</td>
+                <td><code>gate/evaluate-gate.ts</code></td>
+                <td>title ∧ brand ∧ price ∧ category ∧ identifier ∧ no blocking signal</td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>Policy detectors</td>
+                <td><code>policy-engine/router.ts</code></td>
+                <td>any of 9 blocking signals → review</td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>Identity update</td>
+                <td><code>identity-policy.ts</code></td>
+                <td>strength&lt;0.7 freeze · brand 3-consecutive · gtin/mpn conflict freeze · unfreeze@5</td>
+            </tr>
+            <tr>
+                <td>—</td>
+                <td>Category confidence</td>
+                <td><code>ingestion-spine/orchestrator.ts:162</code></td>
+                <td><strong>hardcoded <code>0.0</code></strong> (never wired)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>11. Why clients say competitors are superior (the diagnosis)</h2>
+    <ol>
+        <li><strong>The 5-field AND-gate is binary, uniform, and price is non-fillable</strong> → valid-but-incomplete products dead-end; a reviewer who can see the price can't enter it.</li>
+        <li><strong>Extraction breaks silently at commerce-critical fields</strong> (a missed <code>@graph</code> JSON-LD shape cascades into "missing brand/price/identifier"); category confidence is hardcoded to 0.</li>
+        <li><strong>The catalog is schema-agnostic</strong> — no notion of product <em>kind</em>; the global gate is the only enforcement, applied identically to a phone and a medicine.</li>
+        <li><strong>Source URL and reviews are second-class</strong> (URL is ingestion metadata; reviews are a scalar).</li>
+        <li><strong>Identity only fires on a present GTIN</strong> — which extraction rarely captures — so the same product across marketplaces duplicates.</li>
+    </ol>
+
+    <hr>
+
+    <h1 class="part-header">PART 3 — Target design (after phases −1 → 4)</h1>
+
+    <h2>12. North star & the four pillars</h2>
+    <p><strong>Permissive intake, strict publish — on a GTIN/identity spine.</strong> Target journey:</p>
+    <div class="mermaid">
+flowchart TD
+  S[Source] --> FE[Fetch + render]
+  FE --> EX[Generic schema-guided extractor\nper-site/JSON-LD = fast path]
+  EX --> MP[Map → canonical]
+  MP --> ID[Identity: typed multi-id set\nbackfill GTIN if missing]
+  ID --> AR[Archetype classify → family]
+  AR --> CS{Weighted completeness\n≥ publish threshold?}
+  CS -->|yes & strong-key identity| PR[Promote]
+  CS -->|no / contested identity| LB[Anomaly Lab\nfillable incl. price; merge candidates; escape hatch]
+  LB --> PR
+  PR --> CW[Catalog write + per-source authority]
+    </div>
+
+    <ul>
+        <li><strong>A · Extraction</strong> — generic LLM/vision schema-guided extractor is the backbone; per-site + JSON-LD are fast-path optimizations.</li>
+        <li><strong>B · Completeness & lab</strong> — product archetypes with <strong>tiered, weighted</strong> attributes; completeness <strong>score</strong> replaces the binary gate; Lab <strong>fully fillable incl. price</strong>.</li>
+        <li><strong>C · Identity</strong> — typed multi-identifier set; <strong>auto-merge only on a strong corroborated key</strong> (fuzzy/backfill propose to the Lab); GTIN <strong>backfill</strong> with a candidate→strong rule; <code>identifier_exists=false</code> escape hatch; per-source authority; reversible audited merges.</li>
+        <li><strong>D · Catalog polish</strong> — source URL first-class & displayed; reviews normalized + aggregated.</li>
+    </ul>
+
+    <h2>12A. Visual walkthrough — target flow & gates</h2>
+    <p><strong>Target admission: completeness gate replaces the binary AND</strong> (weighted, per archetype):</p>
+    <div class="mermaid">
+flowchart TD
+  O[AdapterOutput plus archetype] --> HF{Hard floor<br/>title and identity-or-escape-hatch}
+  HF -->|no| S[Stage to Lab]
+  HF -->|yes| SC[Score equals sum weight present required over sum weight required]
+  SC --> TH{score ≥ publish threshold}
+  TH -->|yes| ADMIT[Promote]
+  TH -->|no| S
+  S --> GAP[Lab shows weighted gap, fillable incl. price]
+    </div>
+
+    <p><strong>Target identity: strong-key-or-Lab</strong> (auto-merge only on a shared strong key, no variant conflict):</p>
+    <div class="mermaid">
+flowchart TD
+  I[Incoming identifiers plus variant] --> Q1{shared STRONG key with a candidate}
+  Q1 -->|yes| Q2{variant conflict<br/>storage size region}
+  Q1 -->|no| Q3{any fuzzy or backfill candidate}
+  Q2 -->|no| AM[Auto-merge]
+  Q2 -->|yes| LP[Propose to Lab]
+  Q3 -->|yes| LP
+  Q3 -->|no| NEW[Create new product]
+    </div>
+
+    <p><strong>Target backfill: candidate to strong promotion</strong> (the formal corroboration rule):</p>
+    <div class="mermaid">
+flowchart TD
+  NK[No strong key present] --> BF[Backfill lookup Icecat plus UPCitemdb]
+  BF --> C{≥2 independent providers agree}
+  C -->|no| CAND[Candidate weak<br/>may key a NEW product only]
+  C -->|yes| RT{round-trip match<br/>brand equal and title overlap ≥0.6}
+  RT -->|no| CAND
+  RT -->|yes| STRONG[Promote to STRONG<br/>eligible to merge]
+  STRONG --> CONF{later conflicting higher-authority strong}
+  CONF -->|yes| DEMOTE[Demote, freeze, review]
+    </div>
+
+    <p><strong>Target product state machine</strong> (explicit states + legal transitions; merged is terminal):</p>
+    <div class="mermaid">
+stateDiagram-v2
+  [*] --> staged
+  staged --> active: gate passes or Lab promote
+  staged --> archived
+  staged --> merged
+  active --> frozen_pending_review: identity conflict
+  frozen_pending_review --> active: consistent signal
+  active --> merged: strong-key merge
+  active --> archived
+  archived --> active
+  merged --> [*]
+    </div>
+
+    <h2>13. End-state schema deltas (verbatim target DDL)</h2>
+
+    <h3>13.1 Multi-identifier set + concurrency guard (Phase 2)</h3>
+    <pre><code class="language-sql">ALTER TABLE catalog_products
+  ADD COLUMN identifiers       jsonb   NOT NULL DEFAULT '[]'::jsonb,  -- typed identifier set
+  ADD COLUMN identifier_exists boolean NOT NULL DEFAULT true,         -- escape hatch
+  ADD COLUMN pipeline_version  integer NOT NULL DEFAULT 1;            -- old=1, new=2 (anti-dup)
+CREATE INDEX idx_catalog_products_identifiers
+  ON catalog_products USING gin (identifiers jsonb_path_ops);         -- match-on-any, indexed
+
+-- DB-enforced single winner on a strong key (concurrency / anti-duplication)
+CREATE TABLE product_strong_identifiers (
+  tenant_id uuid NOT NULL, identifier_type text NOT NULL, identifier_value text NOT NULL,
+  product_id uuid NOT NULL REFERENCES catalog_products(product_id),
+  PRIMARY KEY (tenant_id, identifier_type, identifier_value)
+);</code></pre>
+    <p><code>identifiers[]</code> element shape (TS):</p>
+    <pre><code class="language-typescript">interface Identifier {
+  type: "gtin"|"upc"|"mpn"|"asin"|"shopify_gid"|"ebay_id"|"merchant_sku";
+  value: string;
+  source: string;          // "connector:shopify" | "link:croma" | "backfill:icecat"
+  corroborated?: boolean;  // backfill→strong ONLY via promoteBackfill (≥2 providers + round-trip)
+}
+// strength: gtin/upc/mpn = strong; asin/shopify_gid/ebay_id = namespace; merchant_sku = tenant;
+//           backfill & !corroborated = weak. Auto-merge requires a shared STRONG key + no variant conflict.</code></pre>
+
+    <h3>13.2 Archetype model (Phase 1) — <code>family</code> finally wired</h3>
+    <pre><code class="language-typescript">type AttributeTier = "required" | "recommended" | "optional";
+interface AttributeSpec { field: string; tier: AttributeTier; weight: number; } // weighted (D4)
+interface Archetype   { id: string; label: string; attributes: AttributeSpec[]; }
+// e.g. smartphone: base_price/currency/identifier weight 1; title/brand 0.8; category 0.6; images 0.4 …
+// catalog_products.family = classifyArchetype(category, title, brand); completeness scored per archetype.</code></pre>
+    <p><strong>Completeness</strong> = <code>Σ weight(present required) / Σ weight(all required)</code>, per channel; admit when <code>hardFloorOk (title + identity-or-escape-hatch) AND score ≥ publishThreshold</code>.</p>
+
+    <h3>13.3 GTIN backfill (Phase 2) — corroboration, formally</h3>
+    <p><code>corroborated=true</code> is set by <strong>one path</strong> (<code>promoteBackfill</code>): the same <code>{type,value}</code> from <strong>≥2 independent providers</strong> AND a <strong>round-trip</strong> match (brand equals ours, title token-overlap ≥0.6). Candidates may key a <em>new</em> product immediately; they may <strong>merge</strong> two existing products only once strong. Conflicting higher-authority strong value → demote + freeze + review.</p>
+
+    <h3>13.4 Normalized reviews (Phase 4)</h3>
+    <pre><code class="language-sql">CREATE TABLE catalog_reviews (
+  review_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  uuid NOT NULL REFERENCES catalog_products(product_id),
+  source      text NOT NULL, author text, rating numeric(3,2) NOT NULL, body text,
+  reviewed_at timestamptz, dedupe_key text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (product_id, dedupe_key)            -- cross-source dedupe
+);</code></pre>
+    <p>Cross-source rating = count-weighted mean over per-source aggregates. <strong>Source URL</strong> is emitted as a <code>source_url</code> canonical observation → reconciled into <code>winning_values.source_url</code> → displayed.</p>
+
+    <h3>13.5 Eval & calibration (Phase −1) — the measurement substrate</h3>
+    <p>New <code>@aonex/ingestion-eval</code>: a labeled golden set (regression + rotating holdout), <strong>weighted</strong> field precision/recall, the <strong>north metric (auto-promote precision)</strong> + guardrail (auto-promote rate), a CI gate, and a bridge feeding <code>@aonex/calibration</code> (isotonic + beta-binomial) so confidence becomes empirical, not arbitrary.</p>
+
+    <h2>14. End-state component HLD</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Role</th>
+                <th>Key contract</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Eval harness</td>
+                <td>scores every change; CI gate</td>
+                <td><code>auto-promote precision</code> ≥ 0.98 to widen automation</td>
+            </tr>
+            <tr>
+                <td>Archetype registry + classifier</td>
+                <td>product <em>type</em> + per-type required/weighted attributes</td>
+                <td><code>family</code> column; rules-first, abstain on ambiguity</td>
+            </tr>
+            <tr>
+                <td>Completeness scorer</td>
+                <td>replaces the binary gate</td>
+                <td>weighted % per archetype × channel + hard floor</td>
+            </tr>
+            <tr>
+                <td>Identity (resolve-v2)</td>
+                <td>strong-key-or-Lab</td>
+                <td>auto-merge only on shared strong key + no variant conflict</td>
+            </tr>
+            <tr>
+                <td>GTIN backfill</td>
+                <td>manufacture the universal key</td>
+                <td>Icecat/UPCitemdb, multi-candidate, cost-capped, promotion rule</td>
+            </tr>
+            <tr>
+                <td>Generic extractor</td>
+                <td>"any site"</td>
+                <td>schema-from-archetype → model fills → isotonic-calibrated confidence</td>
+            </tr>
+            <tr>
+                <td>Entity resolution (Phase 4)</td>
+                <td>dedupe at scale</td>
+                <td>blocking + multi-feature (embedding/spec/price) → Lab proposals</td>
+            </tr>
+            <tr>
+                <td>Lab intelligence</td>
+                <td>humans fix what matters first</td>
+                <td>value-at-stake priority, batching, feedback loop into calibration</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>15. Locked decisions, tradeoffs & SLOs (governing the build)</h2>
+    <ul>
+        <li><strong>D1 Measurement before mechanism</strong> · <strong>D2 strong-key-or-Lab</strong> · <strong>D3 backfill promotion rule</strong> · <strong>D4 one vertical / weighted completeness / new-ingests / we own the taxonomy</strong> · <strong>D5 anti-dup by reading + heal-on-touch, not migrating.</strong></li>
+        <li><strong>Tradeoffs:</strong> lower auto-promote rate early (precision first); higher per-URL cost on the long tail, capped.</li>
+        <li><strong>SLOs:</strong> Lab load ≤35% (alarm 50%, target 15%); shippable-at-scale ≥70% auto-promote at ≥98% precision; weekly drift job; cost-cap → <code>budget_truncated</code> partial, never silent drop.</li>
+        <li><strong>Lab capacity:</strong> ~2 FTE at 35% of ~5k/day, trending &lt;1 FTE at 15%; Lab decisions feed calibration + the eval holdout (a training source, not a sink).</li>
+    </ul>
+
+    <h2>16. End-state "day in the life"</h2>
+    <ol>
+        <li>A client pastes a <strong>Walmart URL</strong> for a product on a site we have no parser for. The generic extractor fills 18 fields; no GTIN, so backfill resolves one from brand+model; that GTIN <strong>matches an existing Shopify-sourced product</strong> → we attach a Walmart-channel observation, not a duplicate. Completeness 94% for <code>smartphone</code> → <strong>auto-promoted, no human touch.</strong></li>
+        <li>A <strong>handmade candle</strong> (CSV, no GTIN) gets <code>identifier_exists=false</code>, scores 80% for <code>home-fragrance</code> → <strong>published</strong>, no false "missing identifier" block.</li>
+        <li>An <strong>ambiguous listing</strong> lands in the Lab at 76%, one missing attribute + an unparsed price. A reviewer <strong>types the price</strong>, accepts the suggested category, promotes in ten seconds — and that decision trains the calibrator.</li>
+    </ol>
+
+    <hr>
+
+    <h1 class="part-header">PART 4 — Reference</h1>
+
+    <h2>17. Roadmap</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Phase</th>
+                <th>Theme</th>
+                <th>Ships</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>−1 — Measurement</strong></td>
+                <td>Eval harness</td>
+                <td>golden set, north metric + guardrail, drift, CI gate (reuses <code>@aonex/calibration</code>)</td>
+            </tr>
+            <tr>
+                <td><strong>0 — Stop the bleeding</strong></td>
+                <td>Quick wins</td>
+                <td><code>@graph</code>/JS extraction fix; <strong>fillable price</strong> in the Lab</td>
+            </tr>
+            <tr>
+                <td><strong>1 — Foundations</strong></td>
+                <td>Archetypes + completeness</td>
+                <td>wire <code>family</code>; archetype registry; weighted score replaces binary gate (flagged, one vertical, new ingests)</td>
+            </tr>
+            <tr>
+                <td><strong>2 — Identity spine</strong></td>
+                <td>Uniqueness & credibility</td>
+                <td>typed multi-id; strong-key-or-Lab; GTIN backfill + promotion; escape hatch; authority; <code>pipeline_version</code> + heal-on-touch; state machine/idempotency/concurrency</td>
+            </tr>
+            <tr>
+                <td><strong>3 — Generic extraction</strong></td>
+                <td>"Any site"</td>
+                <td>schema-guided LLM/vision backbone; calibrated confidence</td>
+            </tr>
+            <tr>
+                <td><strong>4 — Depth + polish</strong></td>
+                <td>ER + Lab + catalog</td>
+                <td>blocking + multi-feature ER; Lab intelligence; source URL; normalized reviews</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>18. Glossary</h2>
+    <ul>
+        <li><strong>Observation</strong> — one source's claim about one attribute at one time, with confidence.</li>
+        <li><strong><code>values</code> (4-axis)</strong> — <code>[attribute][channel|_unscoped][locale|_unscoped] → Observation[]</code>.</li>
+        <li><strong><code>winning_values</code></strong> — reconciled, displayed value per attribute (projected to generated columns).</li>
+        <li><strong>AdapterOutput</strong> — the normalized output every source adapter emits.</li>
+        <li><strong>CANONICAL_MINIMUM</strong> — today's five hard-required gate fields.</li>
+        <li><strong>Archetype / family</strong> — product <em>type</em> defining tiered, weighted required attributes. (Target.)</li>
+        <li><strong>Completeness score</strong> — weighted % of an archetype's required attributes present, per channel.</li>
+        <li><strong>Multi-identifier / strong-key-or-Lab</strong> — typed identifier set; auto-merge only on a shared strong corroborated key, else a Lab merge proposal. (Target.)</li>
+        <li><strong>GTIN backfill</strong> — resolving a missing GTIN from external registries; candidate→strong on corroboration. (Target.)</li>
+        <li><strong>Golden record</strong> — the single reconciled <code>catalog_products</code> row for one physical product.</li>
+    </ul>
+</body>
+</html>
