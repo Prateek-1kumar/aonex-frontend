@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, Suspense } from "react";
 import { CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QueueItem, QueueStats, StagedDetail, Evidence } from "./lib/lab-types";
@@ -10,10 +10,15 @@ import { ExtractedDetails } from "./components/ExtractedDetails";
 import { LabEvidencePane } from "./components/LabEvidencePane";
 import { MatchCandidateBanner } from "./components/MatchCandidateBanner";
 import { ActionBar } from "./components/ActionBar";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
-export default function AnomalyLabPage() {
+function AnomalyLabPageContent() {
+  const searchParams = useSearchParams();
+  const idParam = searchParams.get("id");
+  const router = useRouter();
+
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
   const [detail, setDetail] = useState<StagedDetail | null>(null);
@@ -57,6 +62,14 @@ export default function AnomalyLabPage() {
         setQueue(items);
         queueRef.current = items;
         setStats(s);
+
+        if (idParam) {
+          const foundIdx = items.findIndex((i) => i.stagedProductId === idParam);
+          if (foundIdx !== -1) {
+            setIndex(foundIdx);
+            indexRef.current = foundIdx;
+          }
+        }
       } catch (e) {
         showToast({ type: "error", message: (e as Error).message });
       } finally {
@@ -64,7 +77,18 @@ export default function AnomalyLabPage() {
       }
     }
     void init();
-  }, [loadQueue]);
+  }, [loadQueue, idParam]);
+
+  // Handle direct navigation or parameter updates when queue is already loaded
+  useEffect(() => {
+    if (idParam && queue.length > 0) {
+      const foundIdx = queue.findIndex((i) => i.stagedProductId === idParam);
+      if (foundIdx !== -1 && foundIdx !== index) {
+        setIndex(foundIdx);
+        indexRef.current = foundIdx;
+      }
+    }
+  }, [idParam, queue, index]);
 
   // When current item changes: load detail + evidence
   const current = queue[index] ?? null;
@@ -393,5 +417,18 @@ export default function AnomalyLabPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AnomalyLabPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <Loader2 size={28} className="animate-spin text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">Loading queue…</p>
+      </div>
+    }>
+      <AnomalyLabPageContent />
+    </Suspense>
   );
 }

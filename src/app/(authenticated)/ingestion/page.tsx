@@ -49,9 +49,18 @@ export default function IngestionPage() {
   }
 
   const handleFile = useCallback(async (file: File) => {
-    const allowed = ["text/csv", "application/pdf", "application/vnd.ms-excel"];
-    if (!allowed.includes(file.type) && !file.name.endsWith(".csv")) {
-      showToast({ type: "error", message: "Only CSV or PDF files are accepted." });
+    const allowed = [
+      "text/csv",
+      "application/pdf",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/x-iwork-numbers-sffnumbers",
+      "application/octet-stream",
+    ];
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const isAllowedExt = ["csv", "pdf", "xlsx", "numbers"].includes(ext ?? "");
+    if (!allowed.includes(file.type) && !isAllowedExt) {
+      showToast({ type: "error", message: "Only CSV, PDF, Excel (.xlsx), or Numbers (.numbers) files are accepted." });
       return;
     }
     setBusy("file");
@@ -147,7 +156,7 @@ export default function IngestionPage() {
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.pdf"
+            accept=".csv,.pdf,.xlsx,.numbers"
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
           />
@@ -164,9 +173,13 @@ export default function IngestionPage() {
             <p className="mt-1.5 text-sm text-muted-foreground">
               Drag &amp; drop{" "}
               <span className="text-primary/100">PDF</span>
-              {" "}or{" "}
+              {", "}
               <span className="text-primary/100">CSV</span>
-              {" "}to begin neural orchestration
+              {", "}
+              <span className="text-primary/100">Excel</span>
+              {" or "}
+              <span className="text-primary/100">Numbers</span>
+              {" to begin neural orchestration"}
             </p>
             <p className="mt-3 text-xs text-muted-foreground/50 uppercase tracking-widest">
               — or click to browse —

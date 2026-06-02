@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { getDisplayPrice } from "./lib/price";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 type TabKey = "all" | "needs_enrichment" | "active" | "draft" | "archived";
@@ -34,7 +35,11 @@ function computeHealth(p: ListCatalogProductRow): number {
 
 const NEEDS_ENRICHMENT_BELOW = 100; // anything not fully complete needs enrichment
 
-export default function CatalogPage() {
+function CatalogPageContent() {
+  const searchParams = useSearchParams();
+  const idParam = searchParams.get("id");
+  const router = useRouter();
+
   const [products, setProducts] = useState<ListCatalogProductRow[]>([]);
   const [busy, setBusy] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -47,7 +52,18 @@ export default function CatalogPage() {
   const [tab, setTab] = useState<TabKey>("all");
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
-  const handleClose = useCallback(() => setSelectedId(null), []);
+  const handleClose = useCallback(() => {
+    setSelectedId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("id");
+    router.replace(url.pathname + url.search);
+  }, [router]);
+
+  useEffect(() => {
+    if (idParam) {
+      setSelectedId(idParam);
+    }
+  }, [idParam]);
 
   useEffect(() => {
     void loadProducts();
@@ -487,5 +503,18 @@ function FooterStat({
       <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50">{label}</span>
       <span className={`text-sm font-bold tabular-nums ${cls}`}>{value}</span>
     </div>
+  );
+}
+
+export default function CatalogPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-24 text-muted-foreground/60">
+        <Loader2 size={16} className="animate-spin" />
+        <span className="text-sm">Loading catalog…</span>
+      </div>
+    }>
+      <CatalogPageContent />
+    </Suspense>
   );
 }

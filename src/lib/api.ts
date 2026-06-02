@@ -183,6 +183,12 @@ export interface IngestionTrace {
   status?: string;
   filename?: string | null;
   processing_errors?: Array<{ row: number; code: string; message: string; primaryIdentifier?: string }>;
+  children?: Array<{
+    id: string;
+    status: string;
+    external_id: string;
+    raw_data?: Record<string, any>;
+  }>;
 }
 
 export type ProvenanceRung =
