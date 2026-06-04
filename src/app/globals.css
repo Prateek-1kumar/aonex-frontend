@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── App palette: dark (default) ───────────────────────────────
+     Every app colour resolves from one of these tokens. Components must
+     not hardcode literal colours (white/black/emerald/…); use the mapped
+     Tailwind utilities (bg-surface, text-success, border-border, …).      */
   :root {
     --background: 0 0% 4%;
     --foreground: 0 0% 97%;
@@ -10,24 +14,71 @@
     --card: 0 0% 7%;
     --card-foreground: 0 0% 97%;
 
-    --primary: 184 78% 46%;
-    --primary-foreground: 0 0% 4%;
+    /* Raised fills — replace ad-hoc bg-white/[0.0x] overlays */
+    --surface: 0 0% 10%;
+    --surface-hover: 0 0% 14%;
+    /* Code / pre blocks + modal scrim */
+    --code: 0 0% 2%;
+    --overlay: 0 0% 0%;
+
+    /* Brand accent — Electric Azure */
+    --primary: 212 90% 58%;
+    --primary-foreground: 213 40% 9%;
 
     --secondary: 0 0% 12%;
     --secondary-foreground: 0 0% 97%;
 
     --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 48%;
 
     --accent: 0 0% 14%;
     --accent-foreground: 0 0% 97%;
 
+    /* Semantic state colours (tuned to read as text + tint on dark) */
+    --success: 152 52% 58%;
+    --warning: 42 90% 62%;
+    --danger:   2 78% 66%;
+
     --border: 0 0% 100%;
-    --ring: 184 78% 46%;
+    --ring: 212 90% 58%;
 
     --radius: 0.75rem;
     --sidebar-width: 256px;
     --topbar-height: 4rem;
+  }
+
+  /* ── App palette: light ─────────────────────────────────────────
+     Defined and ready; the app stays dark until <html data-theme> is set. */
+  [data-theme="light"] {
+    --background: 210 20% 98%;
+    --foreground: 213 26% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 26% 12%;
+
+    --surface: 210 20% 96%;
+    --surface-hover: 210 16% 91%;
+    --code: 210 20% 95%;
+    --overlay: 0 0% 0%;
+
+    --primary: 212 90% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 16% 93%;
+    --secondary-foreground: 213 26% 12%;
+
+    --muted: 210 16% 93%;
+    --muted-foreground: 213 12% 40%;
+
+    --accent: 210 16% 90%;
+    --accent-foreground: 213 26% 12%;
+
+    --success: 152 60% 32%;
+    --warning:  35 92% 38%;
+    --danger:    2 72% 46%;
+
+    --border: 213 22% 22%;
+    --ring: 212 90% 50%;
   }
 }
 

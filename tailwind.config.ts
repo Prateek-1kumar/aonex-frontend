@@ -36,6 +36,15 @@ export default {
           DEFAULT:    "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        surface: {
+          DEFAULT: "hsl(var(--surface) / <alpha-value>)",
+          hover:   "hsl(var(--surface-hover) / <alpha-value>)",
+        },
+        code:    "hsl(var(--code) / <alpha-value>)",
+        overlay: "hsl(var(--overlay) / <alpha-value>)",
+        success: "hsl(var(--success) / <alpha-value>)",
+        warning: "hsl(var(--warning) / <alpha-value>)",
+        danger:  "hsl(var(--danger) / <alpha-value>)",
         ld: {
           bg:             "rgb(var(--ld-bg) / <alpha-value>)",
           surface:        "rgb(var(--ld-surface) / <alpha-value>)",
