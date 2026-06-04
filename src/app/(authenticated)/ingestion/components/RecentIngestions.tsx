@@ -13,6 +13,7 @@ import {
   ImageOff,
 } from "lucide-react";
 import { api, type RecentIngestion, type SkuJson } from "@/lib/api";
+import { formatPrice, formatRelativeTime } from "@/lib/format";
 
 interface Props {
   onRowClick: (artifactId: string) => void;
@@ -48,29 +49,6 @@ function shortUrl(url: string): string {
   } catch {
     return url.length > 50 ? url.slice(0, 50) + "…" : url;
   }
-}
-
-function relativeTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  const diff = Date.now() - t;
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
-}
-
-function formatPrice(value: number, currency: string | null): string {
-  const sym =
-    currency === "USD" ? "$"
-      : currency === "EUR" ? "€"
-      : currency === "GBP" ? "£"
-      : currency === "INR" ? "₹"
-      : "";
-  return `${sym}${value.toFixed(2)}${sym ? "" : ` ${currency ?? ""}`.trimEnd()}`;
 }
 
 function summarizeSku(sku: SkuJson): {
@@ -254,7 +232,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                   {item.status.replace("_", " ")}
                 </span>
                 <span className="normal-case tracking-normal text-muted-foreground/45">
-                  {relativeTime(item.received_at)}
+                  {formatRelativeTime(item.received_at)}
                 </span>
                 {item.escalated_to && (
                   <span
