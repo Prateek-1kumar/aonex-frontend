@@ -45,7 +45,9 @@ function CatalogPageContent() {
   const [busy, setBusy] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const PAGE_SIZE = 50;
+  const [total, setTotal] = useState<number | null>(null);
+  const PAGE_SIZE = 200;
+  const MAX_AUTOLOAD_PAGES = 25;
   const [toast, setToast] = useState<Toast>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -67,22 +69,42 @@ function CatalogPageContent() {
   }, [idParam]);
 
   useEffect(() => {
-    void loadProducts();
+    void loadAll();
   }, []);
 
-  async function loadProducts() {
+  // Load the first page (which carries the real `total`), render it, then stream
+  // the remaining pages so the grid shows the whole catalog and the tab/search
+  // counts are accurate — instead of being capped at one page.
+  async function loadAll() {
     setBusy(true);
     try {
-      const res = await api.catalog.list({ limit: PAGE_SIZE });
-      setProducts(res.products);
-      setNextCursor(res.nextCursor);
+      const first = await api.catalog.list({ limit: PAGE_SIZE });
+      setTotal(first.total);
+      setProducts(first.products);
+      setBusy(false);
+
+      let cursor = first.nextCursor;
+      let pages = 1;
+      const seen = new Set(first.products.map((p) => p.id));
+      while (cursor && pages < MAX_AUTOLOAD_PAGES) {
+        setLoadingMore(true);
+        const res = await api.catalog.list({ limit: PAGE_SIZE, cursor });
+        const fresh = res.products.filter((p) => !seen.has(p.id));
+        fresh.forEach((p) => seen.add(p.id));
+        setProducts((prev) => [...prev, ...fresh]);
+        cursor = res.nextCursor;
+        pages += 1;
+      }
+      setNextCursor(cursor ?? null);
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
       setBusy(false);
+      setLoadingMore(false);
     }
   }
 
+  // Continue past the auto-load cap (only reached on very large catalogs).
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -180,8 +202,12 @@ function CatalogPageContent() {
     });
   }
 
+  // Authoritative total from the backend; falls back to the loaded count until
+  // the first page resolves. Once auto-load finishes it equals products.length.
+  const realTotal = total ?? counts.total;
+
   const TABS: { key: TabKey; label: string; count: number; dot: string }[] = [
-    { key: "all", label: "All Assets", count: counts.total, dot: "bg-primary" },
+    { key: "all", label: "All Assets", count: realTotal, dot: "bg-primary" },
     { key: "needs_enrichment", label: "Needs Enrichment", count: counts.needs, dot: "bg-warning" },
     { key: "active", label: "Active", count: counts.active, dot: "bg-success" },
     { key: "draft", label: "Draft", count: counts.draft, dot: "bg-muted-foreground" },
@@ -337,10 +363,15 @@ function CatalogPageContent() {
           <FooterStat label="Catalog Health" value={`${counts.avgHealth}%`} tone={counts.avgHealth >= 80 ? "emerald" : counts.avgHealth >= 50 ? "amber" : "rose"} />
           <FooterStat label="Needs Enrichment" value={counts.needs} tone={counts.needs ? "amber" : "muted"} />
           <FooterStat label="Uncategorised" value={counts.uncategorised} tone={counts.uncategorised ? "rose" : "muted"} />
-          <FooterStat label="Total SKUs" value={counts.total} tone="default" />
+          <FooterStat label="Total SKUs" value={realTotal} tone="default" />
+          {loadingMore && (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+              <Loader2 size={12} className="animate-spin" /> Loading {products.length} of {realTotal}…
+            </span>
+          )}
           <button
-            onClick={() => void loadProducts()}
-            disabled={busy}
+            onClick={() => void loadAll()}
+            disabled={busy || loadingMore}
             className="ml-auto flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/75 hover:bg-surface-hover disabled:opacity-40"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh
