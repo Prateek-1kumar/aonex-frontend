@@ -33,9 +33,24 @@ function AnomalyLabPageContent() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, s] = await Promise.all([api.lab.queue(), api.lab.stats()]);
-      setQueue(res.items);
+      // First page (100 max) + the real total from stats, then stream the rest
+      // so the whole queue is listed rather than capped at one page.
+      const [first, s] = await Promise.all([api.lab.queue(100), api.lab.stats()]);
       setStats(s);
+      setQueue(first.items);
+      setLoading(false);
+
+      let cursor = first.nextCursor;
+      let pages = 1;
+      const seen = new Set(first.items.map((i) => i.stagedProductId));
+      while (cursor && pages < 50) {
+        const res = await api.lab.queue(100, cursor);
+        const fresh = res.items.filter((i) => !seen.has(i.stagedProductId));
+        fresh.forEach((i) => seen.add(i.stagedProductId));
+        setQueue((prev) => [...prev, ...fresh]);
+        cursor = res.nextCursor;
+        pages += 1;
+      }
     } catch (e) {
       showToast({ type: "error", message: (e as Error).message });
     } finally {
@@ -110,7 +125,7 @@ function AnomalyLabPageContent() {
       </div>
 
       {/* Summary */}
-      <QueueStatsHeader stats={stats} count={queue.length} />
+      <QueueStatsHeader stats={stats} count={stats?.total ?? queue.length} />
 
       {/* Toast */}
       {toast && (

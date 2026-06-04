@@ -458,13 +458,13 @@ export const api = {
       status?: string;
       limit?: number;
       cursor?: string;
-    }): Promise<{ products: ListCatalogProductRow[]; nextCursor: string | null }> {
+    }): Promise<{ products: ListCatalogProductRow[]; nextCursor: string | null; total: number }> {
       const params = new URLSearchParams();
       if (opts?.status) params.set("status", opts.status);
       if (opts?.limit) params.set("limit", String(opts.limit));
       if (opts?.cursor) params.set("cursor", opts.cursor);
       const qs = params.toString() ? `?${params.toString()}` : "";
-      return request<{ products: ListCatalogProductRow[]; nextCursor: string | null }>(
+      return request<{ products: ListCatalogProductRow[]; nextCursor: string | null; total: number }>(
         `/api/catalog/products${qs}`
       );
     },
