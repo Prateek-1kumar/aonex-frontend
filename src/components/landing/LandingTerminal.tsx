@@ -15,8 +15,8 @@ const LOG_LINES = [
 const COLOR_MAP: Record<string, string> = {
   "log-muted": "text-ld-muted",
   "log-teal":  "text-ld-teal",
-  "log-green": "text-green-400",
-  "log-amber": "text-amber-400",
+  "log-green": "text-success",
+  "log-amber": "text-warning",
 };
 
 export default function LandingTerminal() {
@@ -25,18 +25,18 @@ export default function LandingTerminal() {
       <div className="terminal-grid flex flex-col lg:flex-row gap-12 items-start">
         {/* Terminal window */}
         <div className="terminal-window flex-1 bg-ld-terminal border border-ld-border rounded-[4px] overflow-hidden">
-          <div className="terminal-header flex items-center gap-3 px-5 py-3 border-b border-ld-border bg-[rgba(13,18,20,0.5)]">
+          <div className="terminal-header flex items-center gap-3 px-5 py-3 border-b border-ld-border bg-ld-surface/50">
             <div className="terminal-dots flex items-center gap-1.5">
-              <div className="dot w-3 h-3 rounded-full bg-red-500/70" />
-              <div className="dot w-3 h-3 rounded-full bg-amber-400/70" />
-              <div className="dot w-3 h-3 rounded-full bg-green-500/70" />
+              <div className="dot w-3 h-3 rounded-full bg-danger/70" />
+              <div className="dot w-3 h-3 rounded-full bg-warning/70" />
+              <div className="dot w-3 h-3 rounded-full bg-success/70" />
             </div>
             <div className="terminal-title flex-1 text-center font-dm-mono text-[11px] tracking-wider text-ld-muted">
               AONEX · Neural Processing Log
             </div>
             <div className="terminal-live flex items-center gap-1.5">
-              <div className="live-dot w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="font-dm-mono text-[10px] text-green-400">LIVE</span>
+              <div className="live-dot w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              <span className="font-dm-mono text-[10px] text-success">LIVE</span>
             </div>
           </div>
           <div className="terminal-body px-5 py-4 space-y-1.5">
@@ -67,7 +67,7 @@ export default function LandingTerminal() {
           </p>
           <a
             href="#demo"
-            className="btn btn-primary inline-flex items-center px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-black hover:bg-ld-text transition-colors rounded-[2px]"
+            className="inline-flex items-center px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-ld-bg hover:bg-ld-teal-dim transition-colors rounded-md"
           >
             See It Live
           </a>

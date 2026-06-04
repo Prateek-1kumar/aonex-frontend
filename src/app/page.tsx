@@ -18,12 +18,6 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <div className="bg-ld-bg text-ld-text font-dm-sans overflow-x-hidden">
-      {/* Anti-FOUC: set data-theme before first paint */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `(function(){var t=localStorage.getItem('aonex-theme');document.documentElement.setAttribute('data-theme',t||'dark')})()`,
-        }}
-      />
       <LandingNav />
       <LandingHero />
       <LandingTicker />

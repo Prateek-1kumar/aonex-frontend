@@ -80,7 +80,7 @@ export default function LandingPlatform() {
             {/* Left — PIM */}
             <div className="diff-col diff-col-left p-8 border-b md:border-b-0 md:border-r border-ld-border">
               <div className="diff-col-header mb-6">
-                <span className="diff-col-badge pim inline-block px-3 py-1 text-[10px] font-dm-mono tracking-wider uppercase bg-[rgba(61,26,26,0.6)] text-[#A05050] border border-[#3D1A1A] rounded-[2px] mb-4">
+                <span className="diff-col-badge pim inline-block px-3 py-1 text-[10px] font-dm-mono tracking-wider uppercase bg-danger/10 text-danger/80 border border-danger/25 rounded-[2px] mb-4">
                   Traditional PIM
                 </span>
                 <h3 className="font-display text-2xl font-normal mb-2">Stores. Organises. Waits.</h3>
@@ -128,7 +128,7 @@ export default function LandingPlatform() {
               The Aonex catalog interface gives you a complete view of each SKU across all six enrichment
               and distribution tabs — with a live audit trail and confidence scoring at every field.
             </p>
-            <a href="#demo" className="inline-flex items-center px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-black hover:bg-ld-text transition-colors rounded-[2px]">
+            <a href="#demo" className="inline-flex items-center px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-ld-bg hover:bg-ld-teal-dim transition-colors rounded-md">
               See It Live
             </a>
           </div>
@@ -136,7 +136,7 @@ export default function LandingPlatform() {
           {/* Modal window */}
           <div id="sku-modal" className="sku-modal-window flex-1 bg-ld-surface border border-ld-border rounded-[4px] overflow-hidden transition-all duration-500 [&.visible]:opacity-100 [&.visible]:translate-y-0">
             {/* Header */}
-            <div className="sku-modal-header flex flex-wrap items-center gap-3 px-5 py-3 border-b border-ld-border bg-[rgba(13,18,20,0.4)]">
+            <div className="sku-modal-header flex flex-wrap items-center gap-3 px-5 py-3 border-b border-ld-border bg-ld-surface/40">
               <span className="sku-badge font-dm-mono text-[10px] tracking-wider uppercase bg-ld-teal/10 text-ld-teal px-2 py-0.5 rounded-[2px]">SKU-4821</span>
               <span className="sku-timestamp font-dm-mono text-[10px] text-ld-muted">Today · 14:32:07 UTC</span>
               <span className="sku-product-name font-dm-sans text-xs text-ld-text ml-auto">Bosch 18V LXT Drill Driver Kit</span>
@@ -225,11 +225,11 @@ export default function LandingPlatform() {
                 </div>
                 <div className="seo-metrics-bar flex gap-6">
                   <div className="seo-metric">
-                    <div className="seo-metric-val font-display text-3xl text-ld-teal">96 <span className="seo-trend text-sm font-dm-sans text-green-400">↑ 24</span></div>
+                    <div className="seo-metric-val font-display text-3xl text-ld-teal">96 <span className="seo-trend text-sm font-dm-sans text-success">↑ 24</span></div>
                     <div className="seo-metric-label font-dm-mono text-[10px] text-ld-muted">SEO Score</div>
                   </div>
                   <div className="seo-metric">
-                    <div className="seo-metric-val font-display text-3xl text-ld-teal">84% <span className="seo-trend text-sm font-dm-sans text-green-400">↑ 18%</span></div>
+                    <div className="seo-metric-val font-display text-3xl text-ld-teal">84% <span className="seo-trend text-sm font-dm-sans text-success">↑ 18%</span></div>
                     <div className="seo-metric-label font-dm-mono text-[10px] text-ld-muted">Search Vis.</div>
                   </div>
                 </div>
@@ -265,11 +265,11 @@ export default function LandingPlatform() {
             {/* Ring */}
             <div className="health-ring-container relative flex flex-col items-center justify-center" data-health-score="78">
               <svg className="health-ring-svg w-40 h-40 -rotate-90" viewBox="0 0 160 160" aria-label="Catalog health score: 78%">
-                <circle className="health-ring-bg" cx="80" cy="80" r="70" fill="none" stroke="#1E2D30" strokeWidth="8" />
+                <circle className="health-ring-bg" cx="80" cy="80" r="70" fill="none" stroke="rgb(var(--ld-border))" strokeWidth="8" />
                 <circle
                   className="health-ring-fill"
                   cx="80" cy="80" r="70"
-                  fill="none" stroke="#1AC1CE" strokeWidth="8"
+                  fill="none" stroke="rgb(var(--ld-teal))" strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray="440"
                   strokeDashoffset="440"
@@ -285,7 +285,7 @@ export default function LandingPlatform() {
             <div className="status-badges-group">
               <h4 className="automation-group-title font-dm-mono text-[10px] tracking-widest uppercase text-ld-muted mb-4">Channel Status</h4>
               <div className="status-badges space-y-3">
-                {[{dot:"bg-green-400",name:"Amazon EU Sync",val:"HEALTHY"},{dot:"bg-red-400",name:"Flipkart Sync",val:"CRITICAL"},{dot:"bg-amber-400",name:"Zalando Sync",val:"LAGGING"}].map((b) => (
+                {[{dot:"bg-success",name:"Amazon EU Sync",val:"HEALTHY"},{dot:"bg-danger",name:"Flipkart Sync",val:"CRITICAL"},{dot:"bg-warning",name:"Zalando Sync",val:"LAGGING"}].map((b) => (
                   <div key={b.name} className="status-badge flex items-center gap-3 transition-all duration-300 [&.visible]:opacity-100 [&.visible]:translate-x-0">
                     <div className={`status-badge-dot w-2 h-2 rounded-full ${b.dot}`} />
                     <span className="status-badge-name font-dm-sans text-xs text-ld-text flex-1">{b.name}</span>
@@ -303,7 +303,7 @@ export default function LandingPlatform() {
                   <div key={label} className="toggle-row flex items-center justify-between">
                     <span className="toggle-label font-dm-sans text-sm text-ld-text">{label}</span>
                     <div className="toggle-pill w-10 h-5 bg-ld-border rounded-full relative cursor-pointer transition-colors [&.on]:bg-ld-teal" aria-label={`${label} enabled`}>
-                      <div className="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform [.on_&]:translate-x-5" />
+                      <div className="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-ld-text rounded-full transition-transform [.on_&]:translate-x-5" />
                     </div>
                   </div>
                 ))}
@@ -320,7 +320,7 @@ export default function LandingPlatform() {
           </div>
           <a
             href="#demo"
-            className="btn btn-primary btn-scanline inline-flex items-center shrink-0 px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-black hover:bg-ld-text transition-colors rounded-[2px]"
+            className="inline-flex items-center shrink-0 px-6 py-3 text-sm font-medium font-dm-sans bg-ld-teal text-ld-bg hover:bg-ld-teal-dim transition-colors rounded-md"
           >
             Request a Demo
           </a>

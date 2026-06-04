@@ -1,18 +1,29 @@
 "use client";
 
-export default function ThemeToggle() {
+/**
+ * Unified light/dark toggle used in both the landing nav and the app sidebar.
+ * Flips `data-theme` on <html> and persists it; the sun/moon icon swap is driven
+ * by the `.sun-icon` / `.moon-icon` rules in globals.css. Pass `className` to
+ * adopt the host surface's tokens (landing `--ld-*` vs app foreground tokens).
+ */
+export default function ThemeToggle({ className = "" }: { className?: string }) {
   const toggle = () => {
-    const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    const next =
+      document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("aonex-theme", next);
+    try {
+      localStorage.setItem("aonex-theme", next);
+    } catch {
+      /* storage unavailable — toggle still applies for this session */
+    }
   };
 
   return (
     <button
       id="theme-toggle"
       onClick={toggle}
-      aria-label="Toggle theme"
-      className="w-9 h-9 flex items-center justify-center text-ld-muted hover:text-ld-text transition-colors"
+      aria-label="Toggle light or dark theme"
+      className={["flex items-center justify-center transition-colors", className].join(" ")}
     >
       {/* Sun — shown in dark mode */}
       <svg className="sun-icon w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

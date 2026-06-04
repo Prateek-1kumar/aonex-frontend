@@ -11,11 +11,11 @@ export default function LandingHero() {
   return (
     <header className="hero relative min-h-screen flex items-center pt-[68px]">
       {/* Background grid */}
-      <div className="hero-bg-grid absolute inset-0 bg-[image:linear-gradient(rgba(30,45,48,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(30,45,48,0.3)_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none" />
+      <div className="hero-bg-grid absolute inset-0 pointer-events-none" />
 
       {/* Glow blobs */}
-      <div className="hero-glow-1 absolute -top-20 -left-40 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle,rgba(26,193,206,0.08)_0%,transparent_70%)] pointer-events-none" />
-      <div className="hero-glow-2 absolute top-1/3 -right-20 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(26,193,206,0.05)_0%,transparent_70%)] pointer-events-none" />
+      <div className="hero-glow-1 absolute -top-20 -left-40 w-[700px] h-[700px] rounded-full pointer-events-none" />
+      <div className="hero-glow-2 absolute top-1/3 -right-20 w-[500px] h-[500px] rounded-full pointer-events-none" />
 
       <div className="hero-content relative max-w-5xl mx-auto px-6 md:px-16 py-24 w-full">
         {/* Eyebrow */}
@@ -31,7 +31,7 @@ export default function LandingHero() {
         {/* Headline */}
         <h1 className="font-display text-5xl md:text-7xl lg:text-[82px] font-normal leading-[1.04] tracking-tight mb-8 max-w-4xl">
           From raw data to{" "}
-          <span className="text-teal italic">market revenue</span>
+          <span className="text-ld-teal italic">market revenue</span>
           {" "}in one engine.
         </h1>
 
@@ -45,13 +45,13 @@ export default function LandingHero() {
         <div className="hero-ctas flex flex-col sm:flex-row gap-4 mb-16">
           <a
             href="#demo"
-            className="btn btn-primary inline-flex items-center justify-center px-8 py-3.5 text-sm font-medium font-dm-sans bg-ld-teal text-black hover:bg-ld-text transition-colors rounded-[2px]"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-sm font-medium font-dm-sans bg-ld-teal text-ld-bg hover:bg-ld-teal-dim transition-all rounded-md shadow-[0_10px_40px_-12px_rgb(var(--ld-teal)/0.6)] hover:shadow-[0_14px_50px_-12px_rgb(var(--ld-teal)/0.7)]"
           >
             Request a Demo
           </a>
           <a
             href="#how-it-works"
-            className="btn btn-ghost inline-flex items-center justify-center px-8 py-3.5 text-sm font-medium font-dm-sans border border-ld-border text-ld-text hover:border-ld-teal hover:text-ld-teal transition-colors rounded-[2px]"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-sm font-medium font-dm-sans border border-ld-border text-ld-text hover:border-ld-teal hover:text-ld-teal transition-colors rounded-md"
           >
             Explore the Platform
           </a>
