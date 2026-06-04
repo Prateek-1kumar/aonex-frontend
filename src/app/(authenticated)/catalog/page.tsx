@@ -85,13 +85,15 @@ function CatalogPageContent() {
 
       let cursor = first.nextCursor;
       let pages = 1;
-      const seen = new Set(first.products.map((p) => p.id));
       while (cursor && pages < MAX_AUTOLOAD_PAGES) {
         setLoadingMore(true);
         const res = await api.catalog.list({ limit: PAGE_SIZE, cursor });
-        const fresh = res.products.filter((p) => !seen.has(p.id));
-        fresh.forEach((p) => seen.add(p.id));
-        setProducts((prev) => [...prev, ...fresh]);
+        // Dedupe against the current list (not a local set) so overlapping loads
+        // — e.g. React StrictMode's double-invoke — can't produce duplicate keys.
+        setProducts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...res.products.filter((p) => !seen.has(p.id))];
+        });
         cursor = res.nextCursor;
         pages += 1;
       }

@@ -324,6 +324,13 @@ export const api = {
       return body as { token: string; expiresAt: string };
     });
   },
+  logout() {
+    // Hits the Next route, which revokes the server session then clears the
+    // httpOnly cookie. Resolves even on failure so the UI can always redirect.
+    return fetch("/api/auth/logout", { method: "POST" })
+      .then(() => undefined)
+      .catch(() => undefined);
+  },
   signup(email: string, password: string, displayName: string, tenantName: string) {
     return request<{ token: string; expiresAt: string }>("/api/auth/signup", {
       method: "POST",
