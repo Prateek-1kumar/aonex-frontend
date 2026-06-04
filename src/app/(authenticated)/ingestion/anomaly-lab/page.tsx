@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef, Suspense } from "react";
-import { CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { useEffect, useCallback, useMemo, useState, Suspense } from "react";
+import {
+  CheckCircle2, AlertCircle, Loader2, RefreshCw, Search, Package, ChevronRight,
+} from "lucide-react";
 import { api } from "@/lib/api";
-import type { QueueItem, QueueStats, StagedDetail, Evidence } from "./lib/lab-types";
+import { formatPrice, formatRelativeTime } from "@/lib/format";
+import type { QueueItem, QueueStats } from "./lib/lab-types";
 import { QueueStatsHeader } from "./components/QueueStatsHeader";
-import { StagedProductForm } from "./components/StagedProductForm";
-import { ExtractedDetails } from "./components/ExtractedDetails";
-import { LabEvidencePane } from "./components/LabEvidencePane";
-import { MatchCandidateBanner } from "./components/MatchCandidateBanner";
-import { ActionBar } from "./components/ActionBar";
+import { PushToCatalogModal } from "./components/PushToCatalogModal";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
@@ -20,403 +19,216 @@ function AnomalyLabPageContent() {
   const router = useRouter();
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [index, setIndex] = useState(0);
-  const [detail, setDetail] = useState<StagedDetail | null>(null);
-  const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [stats, setStats] = useState<QueueStats | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [toast, setToast] = useState<Toast>(null);
-  const [fillValues, setFillValues] = useState<Record<string, string>>({});
-  const [stillMissing, setStillMissing] = useState<string[]>([]);
-
-  // Use a ref so the keyboard handler always sees the latest value without re-registering
-  const skippedIdsRef = useRef<Set<string>>(new Set());
-  const queueRef = useRef<QueueItem[]>([]);
-  const indexRef = useRef(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   function showToast(t: Toast) {
     setToast(t);
     setTimeout(() => setToast(null), 3500);
   }
 
-  const loadQueue = useCallback(async (mergeWith?: QueueItem[], knownSkipped?: Set<string>) => {
-    const res = await api.lab.queue();
-    const skipped = knownSkipped ?? skippedIdsRef.current;
-    if (mergeWith) {
-      const existing = new Set(mergeWith.map((i) => i.stagedProductId));
-      const newItems = res.items.filter(
-        (i) => !existing.has(i.stagedProductId) && !skipped.has(i.stagedProductId)
-      );
-      return [...mergeWith, ...newItems];
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [res, s] = await Promise.all([api.lab.queue(), api.lab.stats()]);
+      setQueue(res.items);
+      setStats(s);
+    } catch (e) {
+      showToast({ type: "error", message: (e as Error).message });
+    } finally {
+      setLoading(false);
     }
-    return res.items.filter((i) => !skipped.has(i.stagedProductId));
   }, []);
 
-  // Mount: load queue + stats
+  useEffect(() => { void load(); }, [load]);
+
+  // Deep-link support: /ingestion/anomaly-lab?id=<stagedProductId> opens that SKU.
   useEffect(() => {
-    async function init() {
-      setInitialLoading(true);
-      try {
-        const [items, s] = await Promise.all([loadQueue(), api.lab.stats()]);
-        setQueue(items);
-        queueRef.current = items;
-        setStats(s);
+    if (idParam) setSelectedId(idParam);
+  }, [idParam]);
 
-        if (idParam) {
-          const foundIdx = items.findIndex((i) => i.stagedProductId === idParam);
-          if (foundIdx !== -1) {
-            setIndex(foundIdx);
-            indexRef.current = foundIdx;
-          }
-        }
-      } catch (e) {
-        showToast({ type: "error", message: (e as Error).message });
-      } finally {
-        setInitialLoading(false);
+  const handleClose = useCallback(() => {
+    setSelectedId(null);
+    if (idParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("id");
+      router.replace(url.pathname + url.search);
+    }
+  }, [router, idParam]);
+
+  const handleResolved = useCallback(
+    (id: string, _kind: "approved" | "rejected" | "linked", message: string) => {
+      setQueue((prev) => prev.filter((i) => i.stagedProductId !== id));
+      setSelectedId(null);
+      if (idParam === id) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("id");
+        router.replace(url.pathname + url.search);
       }
-    }
-    void init();
-  }, [loadQueue, idParam]);
+      showToast({ type: "success", message });
+      // Refresh the breakdown chips in the background — non-blocking.
+      api.lab.stats().then(setStats).catch(() => {});
+    },
+    [idParam, router]
+  );
 
-  // Handle direct navigation or parameter updates when queue is already loaded
-  useEffect(() => {
-    if (idParam && queue.length > 0) {
-      const foundIdx = queue.findIndex((i) => i.stagedProductId === idParam);
-      if (foundIdx !== -1 && foundIdx !== index) {
-        setIndex(foundIdx);
-        indexRef.current = foundIdx;
-      }
-    }
-  }, [idParam, queue, index]);
-
-  // When current item changes: load detail + evidence
-  const current = queue[index] ?? null;
-
-  useEffect(() => {
-    if (!current) {
-      setDetail(null);
-      setEvidence(null);
-      return;
-    }
-    let cancelled = false;
-    const id = current.stagedProductId;
-    setDetail(null);
-    setEvidence(null);
-    setFillValues({});
-    setStillMissing([]);
-
-    api.lab.getStaged(id).then((d) => {
-      if (!cancelled) setDetail(d);
-    }).catch(() => {
-      if (!cancelled) showToast({ type: "error", message: "Failed to load staged product." });
-    });
-    api.lab.evidence(id).then((e) => {
-      if (!cancelled) setEvidence(e);
-    }).catch(() => {
-      // Evidence is optional — don't block on failure
-      if (!cancelled) setEvidence({ kind: "none", content: null });
-    });
-
-    return () => { cancelled = true; };
-  }, [current?.stagedProductId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleFillChange(field: string, value: string) {
-    setFillValues((prev) => ({ ...prev, [field]: value }));
-    if (stillMissing.includes(field)) {
-      setStillMissing((prev) => prev.filter((f) => f !== field));
-    }
-  }
-
-  async function advance(fromIndex?: number) {
-    const idx = fromIndex ?? indexRef.current;
-    const nextIndex = idx + 1;
-    setIndex(nextIndex);
-    indexRef.current = nextIndex;
-
-    // If within 5 of the end, prefetch more items
-    const currentQueue = queueRef.current;
-    if (nextIndex >= currentQueue.length - 5) {
-      try {
-        const res = await api.lab.queue();
-        setQueue((prev) => {
-          const viewed = prev.slice(0, nextIndex);               // items already shown this session
-          const viewedIds = new Set(viewed.map((i) => i.stagedProductId));
-          const freshTail = res.items.filter(
-            (i) => !viewedIds.has(i.stagedProductId) && !skippedIdsRef.current.has(i.stagedProductId)
-          );
-          const merged = [...viewed, ...freshTail];
-          queueRef.current = merged;
-          return merged;
-        });
-      } catch {
-        // silent — just use what we have
-      }
-    }
-  }
-
-  async function handleApprove() {
-    if (!current || !detail) return;
-    setBusy(true);
-    try {
-      const r = await api.lab.approve(current.stagedProductId, fillValues);
-      if (r.ok === false) {
-        setStillMissing(r.stillMissing);
-        showToast({ type: "error", message: "Fill the highlighted fields." });
-      } else {
-        showToast({ type: "success", message: `Approved → product ${r.productId.slice(0, 8)}…` });
-        await advance();
-      }
-    } catch (e) {
-      showToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleReject() {
-    if (!current) return;
-    setBusy(true);
-    try {
-      await api.lab.reject(current.stagedProductId);
-      showToast({ type: "success", message: "Rejected." });
-      await advance();
-    } catch (e) {
-      showToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleLink(productId: string) {
-    if (!current) return;
-    setBusy(true);
-    try {
-      const r = await api.lab.link(current.stagedProductId, productId, fillValues);
-      if (r.ok === false) {
-        setStillMissing(r.stillMissing);
-        showToast({ type: "error", message: "Fill the highlighted fields." });
-      } else {
-        showToast({ type: "success", message: `Linked to product ${r.productId.slice(0, 8)}…` });
-        await advance();
-      }
-    } catch (e) {
-      showToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleSkip() {
-    if (!current) return;
-    skippedIdsRef.current.add(current.stagedProductId);
-    void advance();
-  }
-
-  // Keyboard handler
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const active = document.activeElement;
-      const tag = active?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-
-      switch (e.key.toLowerCase()) {
-        case "a":
-          void handleApprove();
-          break;
-        case "r":
-          void handleReject();
-          break;
-        case "s":
-          handleSkip();
-          break;
-        case "l": {
-          const topLive = detail?.matchCandidates?.find((c) => c.kind === "live");
-          if (topLive) void handleLink(topLive.productId);
-          break;
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail, current, busy, fillValues]);
-
-  // Keep indexRef in sync
-  useEffect(() => {
-    indexRef.current = index;
-  }, [index]);
-
-  // Keep queueRef in sync
-  useEffect(() => {
-    queueRef.current = queue;
-  }, [queue]);
-
-  const FILLABLE_FIELDS = ["title", "brand", "category_path", "identifier"] as const;
-  const priceSatisfied =
-    !detail?.missingFields.includes("pricing.primary") ||
-    ((fillValues["price"] ?? "").trim() !== "" &&
-      (fillValues["currency"] ?? "").trim() !== "");
-  const canApprove =
-    !!detail &&
-    priceSatisfied &&
-    detail.missingFields
-      .filter((f): f is typeof FILLABLE_FIELDS[number] => (FILLABLE_FIELDS as readonly string[]).includes(f))
-      .every((f) => (fillValues[f] ?? "").trim() !== "");
-
-  const topLiveCandidate = detail?.matchCandidates?.find((c) => c.kind === "live") ?? null;
-  const liveCandidates = detail?.matchCandidates?.filter((c) => c.kind === "live") ?? [];
-
-  const total = queue.length;
-  const position = Math.min(index + 1, total);
-
-  // --- Render ---
-
-  if (initialLoading) {
-    return (
-      <div className="animate-in flex flex-col items-center justify-center py-24 gap-3">
-        <Loader2 size={28} className="animate-spin text-muted-foreground/50" />
-        <p className="text-sm text-muted-foreground">Loading queue…</p>
-      </div>
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return queue;
+    return queue.filter((i) =>
+      [i.denormTitle, i.denormBrand, i.sourceKind, i.stagedProductId]
+        .filter(Boolean).join(" ").toLowerCase().includes(term)
     );
-  }
+  }, [queue, search]);
+
+  const selectedItem = useMemo(
+    () => queue.find((i) => i.stagedProductId === selectedId) ?? null,
+    [queue, selectedId]
+  );
 
   return (
-    <div className="animate-in h-full flex flex-col gap-4">
-      {/* Page header */}
+    <div className="animate-in flex flex-col gap-4 pb-10">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl font-bold text-foreground">Anomaly Lab</h1>
           <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Focused Triage Queue
+            Review &amp; push to catalog
           </p>
         </div>
         <button
-          onClick={async () => {
-            setInitialLoading(true);
-            try {
-              const [items, s] = await Promise.all([
-                loadQueue(undefined, skippedIdsRef.current),
-                api.lab.stats(),
-              ]);
-              setQueue(items);
-              queueRef.current = items;
-              setStats(s);
-              setIndex(0);
-              indexRef.current = 0;
-            } catch (e) {
-              showToast({ type: "error", message: (e as Error).message });
-            } finally {
-              setInitialLoading(false);
-            }
-          }}
-          disabled={initialLoading}
+          onClick={() => void load()}
+          disabled={loading}
           className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center disabled:opacity-40"
           aria-label="Refresh queue"
         >
-          {initialLoading ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <RefreshCw size={15} />
-          )}
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
         </button>
       </div>
 
-      {/* Stats header */}
-      <QueueStatsHeader stats={stats} position={position} total={total} />
+      {/* Summary */}
+      <QueueStatsHeader stats={stats} count={queue.length} />
 
       {/* Toast */}
       {toast && (
-        <div
-          className={[
-            "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm border",
-            toast.type === "success"
-              ? "bg-card border-success/20 text-success"
-              : "bg-card border-danger/20 text-danger",
-          ].join(" ")}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 size={15} className="shrink-0" />
-          ) : (
-            <AlertCircle size={15} className="shrink-0" />
-          )}
+        <div className={[
+          "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm border bg-card",
+          toast.type === "success" ? "border-success/20 text-success" : "border-danger/20 text-danger",
+        ].join(" ")}>
+          {toast.type === "success" ? <CheckCircle2 size={15} className="shrink-0" /> : <AlertCircle size={15} className="shrink-0" />}
           {toast.message}
         </div>
       )}
 
-      {/* Empty state */}
-      {total === 0 || index >= total ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <CheckCircle2 size={40} className="text-success mb-4" strokeWidth={1.5} />
-          <p className="font-serif text-lg font-semibold text-foreground/80">
-            All clear — nothing staged
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The triage queue is empty. New items will appear here after ingestion.
-          </p>
-        </div>
-      ) : (
-        /* Main triage layout: 2-column */
-        <div
-          className="grid grid-cols-[1fr_360px] gap-4"
-          style={{ minHeight: "calc(100vh - 280px)" }}
-        >
-          {/* Left column: banner + form + actions */}
-          <div className="flex flex-col gap-4 min-w-0">
-            {liveCandidates.length > 0 && (
-              <MatchCandidateBanner
-                candidates={liveCandidates}
-                onLink={(pid) => void handleLink(pid)}
-                busy={busy}
-              />
-            )}
-
-            {detail ? (
-              <>
-                <StagedProductForm
-                  detail={detail}
-                  fillValues={fillValues}
-                  onChange={handleFillChange}
-                  stillMissing={stillMissing}
-                />
-                <ExtractedDetails observations={detail.observations} />
-              </>
-            ) : (
-              /* Detail loading shimmer */
-              <div className="rounded-xl border border-border/[0.08] bg-card p-5 space-y-3 animate-pulse">
-                <div className="h-3 rounded bg-surface w-1/3" />
-                <div className="h-8 rounded bg-surface" />
-                <div className="h-8 rounded bg-surface" />
-                <div className="h-8 rounded bg-surface" />
-              </div>
-            )}
-
-            <ActionBar
-              onApprove={() => void handleApprove()}
-              onReject={() => void handleReject()}
-              onSkip={handleSkip}
-              onLink={
-                topLiveCandidate
-                  ? () => void handleLink(topLiveCandidate.productId)
-                  : undefined
-              }
-              canApprove={canApprove}
-              busy={busy}
-            />
-
-            {/* Keyboard hint */}
-            <p className="text-[10px] text-muted-foreground/35 uppercase tracking-widest">
-              Keyboard: A approve · R reject · S skip · L link — inactive while typing
-            </p>
-          </div>
-
-          {/* Right column: evidence */}
-          <div className="flex flex-col overflow-hidden">
-            <LabEvidencePane evidence={evidence} />
-          </div>
+      {/* Search */}
+      {queue.length > 0 && (
+        <div className="relative max-w-md">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search title, brand, source…"
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+          />
         </div>
       )}
+
+      {/* List */}
+      {loading && queue.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <Loader2 size={26} className="animate-spin text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Loading queue…</p>
+        </div>
+      ) : queue.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <CheckCircle2 size={40} className="text-success mb-4" strokeWidth={1.5} />
+          <p className="font-serif text-lg font-semibold text-foreground/80">All clear — nothing staged</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            New items appear here when ingestion needs your review before publishing.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-border/[0.08] bg-card p-12 text-center">
+          <p className="font-serif text-lg font-semibold text-foreground/80">Nothing matches “{search}”.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Try a different search.</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+          {filtered.map((item) => (
+            <QueueRow
+              key={item.stagedProductId}
+              item={item}
+              onClick={() => setSelectedId(item.stagedProductId)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Review modal */}
+      {selectedId && selectedItem && (
+        <PushToCatalogModal
+          item={selectedItem}
+          onClose={handleClose}
+          onResolved={handleResolved}
+        />
+      )}
     </div>
+  );
+}
+
+// ── List row ──────────────────────────────────────────────────────────────────
+
+function QueueRow({ item, onClick }: { item: QueueItem; onClick: () => void }) {
+  const missing = item.missingFields.length;
+  const price = formatPrice(item.denormPrice, item.denormCurrency);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left flex items-center gap-4 px-5 py-4 border-t border-border/[0.04] first:border-t-0 hover:bg-surface-hover transition-colors group"
+    >
+      <div className="size-10 rounded-lg bg-surface border border-border/[0.06] flex items-center justify-center shrink-0">
+        <Package size={17} className="text-muted-foreground/35" strokeWidth={1.3} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground/95 truncate group-hover:text-primary transition-colors">
+          {item.denormTitle ?? <span className="text-muted-foreground/50 italic">Untitled product</span>}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/60 flex-wrap">
+          {item.denormBrand && <span className="text-foreground/70 font-medium">{item.denormBrand}</span>}
+          {item.denormBrand && <span>·</span>}
+          <span className="capitalize">{item.sourceKind}</span>
+          <span>·</span>
+          <span>{formatRelativeTime(item.createdAt)}</span>
+        </div>
+      </div>
+
+      {price && (
+        <div className="text-sm font-bold tabular-nums text-foreground/90 shrink-0">{price}</div>
+      )}
+
+      <div className="flex items-center gap-2 shrink-0">
+        {item.candidateCount > 0 && (
+          <span className="hidden sm:inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+            {item.candidateCount} match{item.candidateCount === 1 ? "" : "es"}
+          </span>
+        )}
+        {missing > 0 ? (
+          <span className="inline-flex items-center rounded-full border border-warning/25 bg-warning/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-warning">
+            {missing} to complete
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-success">
+            <CheckCircle2 size={10} /> Ready
+          </span>
+        )}
+        <ChevronRight size={15} className="text-muted-foreground/30 group-hover:text-foreground/60 transition-colors" />
+      </div>
+    </button>
   );
 }
 
