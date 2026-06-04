@@ -134,8 +134,8 @@
   --ld-surface:       13  18  20;
   --ld-surface-light: 17  24  32;
   --ld-border:        30  45  48;
-  --ld-teal:          26 193 206;
-  --ld-teal-dim:      15 138 148;
+  --ld-teal:          52 142 244;   /* Electric Azure — unified site accent */
+  --ld-teal-dim:      17 108 212;
   --ld-text:         242 247 248;
   --ld-muted:         90 122 130;
   --ld-terminal:       5   8   9;
@@ -148,8 +148,8 @@
   --ld-surface:        235 241 242;
   --ld-surface-light:  222 231 232;
   --ld-border:         197 212 215;
-  --ld-teal:            26 193 206;
-  --ld-teal-dim:        15 138 148;
+  --ld-teal:            13 120 242;   /* Electric Azure — unified site accent */
+  --ld-teal-dim:        12  96 200;
   --ld-text:            10  18  20;
   --ld-muted:           77 110 119;
   --ld-terminal:       221 230 231;
@@ -171,10 +171,21 @@
 /* ── Landing: nav scroll state ──────────────────────────────── */
 nav.scrolled { background-color: rgb(var(--ld-bg) / 0.97) !important; }
 
+/* ── Landing: decorative backgrounds (token-driven) ─────────── */
+.hero-bg-grid {
+  background-image:
+    linear-gradient(rgb(var(--ld-border) / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--ld-border) / 0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.hero-glow-1 { background: radial-gradient(circle, rgb(var(--ld-teal) / 0.08) 0%, transparent 70%); }
+.hero-glow-2 { background: radial-gradient(circle, rgb(var(--ld-teal) / 0.05) 0%, transparent 70%); }
+.demo-glow   { background: radial-gradient(circle, rgb(var(--ld-teal) / 0.06) 0%, transparent 70%); }
+
 /* ── Landing: diff strikethrough ────────────────────────────── */
 .strikethrough-line {
   position: absolute; height: 2px;
-  background-color: #ef4444;
+  background-color: hsl(var(--danger));
   width: 0; top: 50%; left: 0;
   transition: width 0.8s ease;
 }

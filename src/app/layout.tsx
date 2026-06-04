@@ -42,6 +42,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* Anti-FOUC: apply the saved theme before first paint (defaults to dark when unset). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('aonex-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={`${playfair.variable} ${poppins.variable} ${cormorant.variable} ${dmSans.variable} ${dmMono.variable} font-sans min-h-screen antialiased bg-background text-foreground`}

@@ -76,13 +76,13 @@ export default function LandingHowItWorks() {
                     <span className="conf-label font-dm-mono text-[10px] text-ld-text flex-1">{bar.label}</span>
                     <span className="conf-value font-dm-mono text-[10px] text-ld-teal">0%</span>
                     {bar.corrected && (
-                      <span className="conf-corrected font-dm-mono text-[9px] text-amber-400 hidden [&.visible]:inline">
+                      <span className="conf-corrected font-dm-mono text-[9px] text-warning hidden [&.visible]:inline">
                         Corrected by reviewer
                       </span>
                     )}
                   </div>
                   <div className="conf-bar-wrap h-1 bg-ld-border rounded-full overflow-hidden">
-                    <div className="conf-bar-fill h-full w-0 bg-ld-teal transition-all duration-1000 [&.red]:bg-red-400 [&.amber]:bg-amber-400 [&.green]:bg-ld-teal" data-target={bar.target} />
+                    <div className="conf-bar-fill h-full w-0 bg-ld-teal transition-all duration-1000 [&.red]:bg-danger [&.amber]:bg-warning [&.green]:bg-ld-teal" data-target={bar.target} />
                   </div>
                 </div>
               ))}
@@ -112,7 +112,7 @@ export default function LandingHowItWorks() {
               source truth vs. AI proposal side-by-side — accept globally or regenerate per field.
             </p>
             <div className="diff-pane-wrap grid grid-cols-2 gap-3 mb-3">
-              <div className="diff-pane diff-pane-left relative p-4 bg-ld-bg border border-ld-border rounded-[2px] transition-colors [&.crossed]:border-red-400/30">
+              <div className="diff-pane diff-pane-left relative p-4 bg-ld-bg border border-ld-border rounded-[2px] transition-colors [&.crossed]:border-danger/30">
                 <div className="diff-pane-label font-dm-mono text-[9px] tracking-wider uppercase text-ld-muted mb-2">System Truth</div>
                 <div className="diff-left-text font-dm-sans text-xs text-ld-dim leading-relaxed min-h-[40px]" />
                 <div className="strikethrough-line" />
@@ -123,10 +123,10 @@ export default function LandingHowItWorks() {
               </div>
             </div>
             <div className="diff-accepted-row flex items-center gap-2 transition-opacity duration-300 [&.visible]:opacity-100">
-              <svg className="diff-check-svg w-4 h-4 text-green-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="diff-check-svg w-4 h-4 text-success" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path className="diff-check-path" d="M2 8l4 4 8-8" />
               </svg>
-              <span className="diff-accepted-label font-dm-mono text-[10px] text-green-400">Accepted · Field: Product Description</span>
+              <span className="diff-accepted-label font-dm-mono text-[10px] text-success">Accepted · Field: Product Description</span>
             </div>
           </div>
           <div className="step-outcome hidden lg:block">
@@ -247,9 +247,9 @@ export default function LandingHowItWorks() {
                 ))}
               </div>
               {[
-                {name:"Amazon EU",  barColor:"bg-ld-teal",   healthLabel:"Operational",healthColor:"text-green-400",on:true},
-                {name:"Flipkart",   barColor:"bg-ld-teal",   healthLabel:"Operational",healthColor:"text-green-400",on:true},
-                {name:"Zalando",    barColor:"bg-amber-400",healthLabel:"Lagging",    healthColor:"text-amber-400",on:false},
+                {name:"Amazon EU",  barColor:"bg-ld-teal",   healthLabel:"Operational",healthColor:"text-success",on:true},
+                {name:"Flipkart",   barColor:"bg-ld-teal",   healthLabel:"Operational",healthColor:"text-success",on:true},
+                {name:"Zalando",    barColor:"bg-warning",healthLabel:"Lagging",    healthColor:"text-warning",on:false},
               ].map((row) => (
                 <div key={row.name} className="marketplace-row grid grid-cols-4 items-center px-4 py-3 border-b last:border-b-0 border-ld-border">
                   <span className="market-name font-dm-sans text-xs text-ld-text">{row.name}</span>
@@ -258,7 +258,7 @@ export default function LandingHowItWorks() {
                   </div>
                   <span className={`sync-health-pill font-dm-mono text-[9px] ${row.healthColor}`}>{row.healthLabel}</span>
                   <div className={`ad-toggle-mini w-7 h-3.5 rounded-full relative transition-colors ${row.on ? "on bg-ld-teal" : "bg-ld-border"}`}>
-                    <div className={`ad-toggle-mini-dot absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${row.on ? "translate-x-[14px]" : "translate-x-0.5"}`} />
+                    <div className={`ad-toggle-mini-dot absolute top-0.5 w-2.5 h-2.5 bg-ld-text rounded-full transition-transform ${row.on ? "translate-x-[14px]" : "translate-x-0.5"}`} />
                   </div>
                 </div>
               ))}

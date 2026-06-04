@@ -8,6 +8,7 @@ import {
   Zap, Terminal, Lock, Circle,
 } from "lucide-react";
 import { api, getLocalProfile, type SystemHealth, type UserProfile } from "@/lib/api";
+import ThemeToggle from "@/components/theme-toggle";
 
 const NAV = [
   { label: "Dashboard",      href: "/dashboard",      icon: Gauge },
@@ -120,8 +121,13 @@ export default function AppSidebar() {
 
       <div className="mx-6 h-px bg-border/[0.06]" />
 
+      {/* Theme toggle — unified with the landing nav */}
+      <div className="px-4 pt-3 pb-1">
+        <ThemeToggle className="size-9 rounded-lg border border-border/[0.08] text-muted-foreground hover:text-foreground hover:bg-surface-hover" />
+      </div>
+
       {/* User */}
-      <div className="px-4 py-4 flex items-center gap-3">
+      <div className="px-4 pt-2 pb-4 flex items-center gap-3">
         <div className="size-8 rounded-full flex items-center justify-center shrink-0 border border-border/[0.08] bg-primary/10">
           <span className="text-[11px] font-bold text-primary">
             {getInitials(displayName)}

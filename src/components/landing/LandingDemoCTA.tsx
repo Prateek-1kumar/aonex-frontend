@@ -5,7 +5,7 @@ export default function LandingDemoCTA() {
       id="demo"
     >
       {/* Glow */}
-      <div className="demo-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(26,193,206,0.06)_0%,transparent_70%)] pointer-events-none" />
+      <div className="demo-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none" />
 
       <div className="demo-content relative max-w-xl mx-auto px-6">
         <span className="section-label font-dm-mono text-[11px] tracking-[0.12em] uppercase text-ld-teal mb-6 block">
@@ -24,11 +24,11 @@ export default function LandingDemoCTA() {
             placeholder="Enter work email"
             required
             autoComplete="email"
-            className="demo-input flex-1 bg-ld-surface border border-ld-border text-ld-text placeholder:text-ld-muted px-4 py-3 text-sm font-dm-sans outline-none focus:border-ld-teal transition-colors rounded-[2px] max-w-xs"
+            className="demo-input flex-1 bg-ld-surface border border-ld-border text-ld-text placeholder:text-ld-muted px-4 py-3 text-sm font-dm-sans outline-none focus:border-ld-teal transition-colors rounded-md max-w-xs"
           />
           <button
             type="submit"
-            className="btn btn-primary px-6 py-3 bg-ld-teal text-black text-sm font-medium font-dm-sans hover:bg-ld-text transition-colors rounded-[2px]"
+            className="px-6 py-3 bg-ld-teal text-ld-bg text-sm font-medium font-dm-sans hover:bg-ld-teal-dim transition-colors rounded-md"
           >
             Request Demo
           </button>
