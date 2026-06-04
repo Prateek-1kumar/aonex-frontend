@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Gauge, Database, LayoutGrid, Sparkles, BarChart3,
-  Zap, Terminal, Lock, Circle,
+  Zap, Terminal, Lock, Circle, LogOut, Loader2,
 } from "lucide-react";
 import { api, getLocalProfile, type SystemHealth, type UserProfile } from "@/lib/api";
 import ThemeToggle from "@/components/theme-toggle";
@@ -45,6 +45,17 @@ export default function AppSidebar() {
   const [lockedSections, setLockedSections] = useState<Set<LockKey>>(
     new Set(["enrichment", "analytics", "optimisation", "command-centre"])
   );
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await api.logout();
+    } finally {
+      // Full navigation so all client state is dropped and middleware re-runs.
+      window.location.href = "/login";
+    }
+  }
 
   useEffect(() => {
     // Real profile — works for both email login (Bearer) and Google OAuth (cookie).
@@ -133,12 +144,21 @@ export default function AppSidebar() {
             {getInitials(displayName)}
           </span>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate text-foreground">{displayName}</p>
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate">
             {role}
           </p>
         </div>
+        <button
+          onClick={() => void handleLogout()}
+          disabled={loggingOut}
+          title="Sign out"
+          aria-label="Sign out"
+          className="ml-auto size-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-40"
+        >
+          {loggingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+        </button>
       </div>
     </aside>
   );

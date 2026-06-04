@@ -42,12 +42,14 @@ function AnomalyLabPageContent() {
 
       let cursor = first.nextCursor;
       let pages = 1;
-      const seen = new Set(first.items.map((i) => i.stagedProductId));
       while (cursor && pages < 50) {
         const res = await api.lab.queue(100, cursor);
-        const fresh = res.items.filter((i) => !seen.has(i.stagedProductId));
-        fresh.forEach((i) => seen.add(i.stagedProductId));
-        setQueue((prev) => [...prev, ...fresh]);
+        // Dedupe against the current list (not a local set) so overlapping loads
+        // — e.g. React StrictMode's double-invoke — can't produce duplicate keys.
+        setQueue((prev) => {
+          const have = new Set(prev.map((i) => i.stagedProductId));
+          return [...prev, ...res.items.filter((i) => !have.has(i.stagedProductId))];
+        });
         cursor = res.nextCursor;
         pages += 1;
       }
