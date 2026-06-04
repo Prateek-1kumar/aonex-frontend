@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronRight, Copy, Check, ImageOff } from "lucide-react";
+import { formatPrice } from "@/lib/format";
 
 /**
  * Renders the full rich extraction for a staged product so reviewers see the
@@ -211,12 +212,9 @@ export function ExtractedDetails({ observations }: Props) {
                     .map(([k, val]) => `${k}: ${val}`)
                     .join(" · ")
                 : "";
-              const price =
-                v.pricing && (v.pricing.sale_price ?? v.pricing.list_price) != null
-                  ? `${v.pricing.currency ?? ""} ${
-                      v.pricing.sale_price ?? v.pricing.list_price
-                    }`.trim()
-                  : null;
+              const price = v.pricing
+                ? formatPrice(v.pricing.sale_price ?? v.pricing.list_price, v.pricing.currency)
+                : null;
               return (
                 <div key={v.sku ?? v.barcode ?? i} className="flex items-center justify-between gap-3 px-2.5 py-1.5">
                   <span className="text-xs text-foreground/80 truncate">

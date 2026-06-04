@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor } from "lucide-react";
 import Nango from "@nangohq/frontend";
 import { api } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { detectRetailer } from "./lib/per-site-detection";
 import { RecentIngestions } from "./components/RecentIngestions";
 import { TraceModal } from "./components/TraceModal";
@@ -313,7 +314,7 @@ export default function IngestionPage() {
                   </span>
                   <span className="text-xs text-muted-foreground/50">
                     {c.connectedAt
-                      ? `since ${new Date(c.connectedAt).toLocaleDateString()}`
+                      ? `since ${formatDate(c.connectedAt)}`
                       : c.status}
                   </span>
                 </div>

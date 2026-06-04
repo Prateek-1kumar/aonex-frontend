@@ -673,24 +673,19 @@ function ChannelPricingBlock({
 }
 
 function PricingLocaleRow({ locale, leaf }: { locale: string; leaf: PricingLeaf }) {
-  const amount =
-    leaf.primaryAmount != null && Number.isFinite(Number(leaf.primaryAmount))
-      ? Number(leaf.primaryAmount).toLocaleString()
-      : null;
-
   return (
     <div className="grid grid-cols-[100px_auto_1fr_1fr] gap-3 px-3 py-1.5 text-xs items-center">
       <span className="font-mono text-muted-foreground/50 text-[10px]">
         {locale === "_unscoped" ? "unscoped" : locale}
       </span>
       <span className="font-semibold tabular-nums text-foreground/85">
-        {leaf.currency} {amount ?? "—"}
+        {formatPrice(leaf.primaryAmount, leaf.currency) ?? "—"}
       </span>
       <span className="text-muted-foreground/40 text-[10px] truncate">
         src: {leaf.source}
       </span>
       <span className="text-muted-foreground/35 text-[10px] text-right">
-        {new Date(leaf.observedAt).toLocaleDateString()}
+        {formatDate(leaf.observedAt)}
       </span>
     </div>
   );
