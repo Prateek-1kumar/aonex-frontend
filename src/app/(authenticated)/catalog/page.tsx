@@ -182,10 +182,10 @@ function CatalogPageContent() {
 
   const TABS: { key: TabKey; label: string; count: number; dot: string }[] = [
     { key: "all", label: "All Assets", count: counts.total, dot: "bg-primary" },
-    { key: "needs_enrichment", label: "Needs Enrichment", count: counts.needs, dot: "bg-amber-400" },
-    { key: "active", label: "Active", count: counts.active, dot: "bg-emerald-400" },
-    { key: "draft", label: "Draft", count: counts.draft, dot: "bg-slate-400" },
-    { key: "archived", label: "Archived", count: counts.archived, dot: "bg-rose-400" },
+    { key: "needs_enrichment", label: "Needs Enrichment", count: counts.needs, dot: "bg-warning" },
+    { key: "active", label: "Active", count: counts.active, dot: "bg-success" },
+    { key: "draft", label: "Draft", count: counts.draft, dot: "bg-muted-foreground" },
+    { key: "archived", label: "Archived", count: counts.archived, dot: "bg-danger" },
   ];
 
   const allChecked = filtered.length > 0 && checked.size >= filtered.length;
@@ -215,14 +215,14 @@ function CatalogPageContent() {
                   "group flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors border",
                   on
                     ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-white/[0.02] border-border/[0.06] text-muted-foreground/70 hover:text-foreground/90 hover:bg-white/[0.04]",
+                    : "bg-surface border-border/[0.06] text-muted-foreground/70 hover:text-foreground/90 hover:bg-surface-hover",
                 ].join(" ")}
               >
                 <span className={`size-1.5 rounded-full ${on ? t.dot : "bg-current opacity-40"}`} />
                 {t.label}
                 <span className={[
                   "tabular-nums rounded-full px-1.5 text-[10px] font-bold",
-                  on ? "bg-primary/15 text-primary" : "bg-white/[0.05] text-muted-foreground/60",
+                  on ? "bg-primary/15 text-primary" : "bg-surface text-muted-foreground/60",
                 ].join(" ")}>{t.count}</span>
               </button>
             );
@@ -234,14 +234,14 @@ function CatalogPageContent() {
             className={[
               "flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] border transition-colors",
               showSearch ? "bg-primary/10 border-primary/30 text-primary"
-                : "bg-white/[0.03] border-border/[0.08] text-foreground/70 hover:bg-white/[0.06]",
+                : "bg-surface border-border/[0.08] text-foreground/70 hover:bg-surface-hover",
             ].join(" ")}
           >
             <SlidersHorizontal size={13} /> Filter
           </button>
           <button
             onClick={exportCsv}
-            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-white/[0.03] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.06] transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover transition-colors"
           >
             <Download size={13} /> Export
           </button>
@@ -256,7 +256,7 @@ function CatalogPageContent() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search title, brand, category, GTIN…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
           />
         </div>
       )}
@@ -265,8 +265,8 @@ function CatalogPageContent() {
         <div className={[
           "mb-4 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
           toast.type === "success"
-            ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-            : "bg-red-500/10 border border-red-500/20 text-red-400",
+            ? "bg-success/10 border border-success/20 text-success"
+            : "bg-danger/10 border border-danger/20 text-danger",
         ].join(" ")}>
           {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
           {toast.message}
@@ -276,7 +276,7 @@ function CatalogPageContent() {
       {/* Table */}
       <div className="rounded-xl border border-border/[0.08] bg-card overflow-hidden">
         {/* Header row */}
-        <div className="grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3 border-b border-border/[0.08] bg-white/[0.015]">
+        <div className="grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3 border-b border-border/[0.08] bg-surface">
           <div className="flex items-center">
             <Checkbox checked={allChecked} onChange={toggleAll} />
           </div>
@@ -323,7 +323,7 @@ function CatalogPageContent() {
           <button
             onClick={() => void loadMore()}
             disabled={loadingMore}
-            className="px-4 py-2 rounded-lg bg-white/[0.04] border border-border/[0.08] text-sm text-foreground/80 hover:bg-white/[0.07] disabled:opacity-40 flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/80 hover:bg-surface-hover disabled:opacity-40 flex items-center gap-2"
           >
             {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
             {loadingMore ? "Loading…" : "Load more"}
@@ -341,7 +341,7 @@ function CatalogPageContent() {
           <button
             onClick={() => void loadProducts()}
             disabled={busy}
-            className="ml-auto flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-white/[0.04] border border-border/[0.08] text-foreground/75 hover:bg-white/[0.07] disabled:opacity-40"
+            className="ml-auto flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/75 hover:bg-surface-hover disabled:opacity-40"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh
           </button>
@@ -398,11 +398,14 @@ function HealthRing({ value }: { value: number }) {
   const r = 13;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, value));
-  const tone = pct >= 80 ? "#34d399" : pct >= 50 ? "#fbbf24" : "#fb7185"; // emerald / amber / rose
+  const tone =
+    pct >= 80 ? "hsl(var(--success))"
+    : pct >= 50 ? "hsl(var(--warning))"
+    : "hsl(var(--danger))";
   return (
     <div className="relative size-9">
       <svg viewBox="0 0 32 32" className="size-full -rotate-90">
-        <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white/[0.07]" />
+        <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-foreground/[0.07]" />
         <circle
           cx="16" cy="16" r={r} fill="none" stroke={tone} strokeWidth="2.5" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c}
@@ -435,7 +438,7 @@ function ProductRow({
       onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
       className={[
         "grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3.5 items-center cursor-pointer",
-        "border-t border-border/[0.05] hover:bg-white/[0.025] transition-colors group",
+        "border-t border-border/[0.05] hover:bg-surface-hover transition-colors group",
         checked ? "bg-primary/[0.04]" : "",
       ].join(" ")}
     >
@@ -445,7 +448,7 @@ function ProductRow({
 
       {/* Product */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="size-10 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+        <div className="size-10 rounded-lg bg-surface border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
           {product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs
             <img src={product.imageUrl} alt="" className="size-full object-cover" loading="lazy"
@@ -491,7 +494,7 @@ function FooterStat({
   tone: "emerald" | "amber" | "rose" | "muted" | "default";
 }) {
   const cls = {
-    emerald: "text-emerald-300", amber: "text-amber-300", rose: "text-rose-300",
+    emerald: "text-success", amber: "text-warning", rose: "text-danger",
     muted: "text-muted-foreground/50", default: "text-foreground/90",
   }[tone];
   return (

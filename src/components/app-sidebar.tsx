@@ -64,9 +64,9 @@ export default function AppSidebar() {
   }, []);
 
   const statusColor = {
-    nominal:  "text-emerald-400",
-    degraded: "text-amber-400",
-    offline:  "text-red-400",
+    nominal:  "text-success",
+    degraded: "text-warning",
+    offline:  "text-danger",
   }[health?.status ?? "nominal"];
 
   const isActive = (href: string) =>
@@ -78,10 +78,7 @@ export default function AppSidebar() {
   const role = profile.role ?? "Member";
 
   return (
-    <aside
-      className="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/[0.06]"
-      style={{ width: "var(--sidebar-width)", background: "hsl(var(--background))" }}
-    >
+    <aside className="fixed inset-y-0 left-0 z-40 flex flex-col w-[var(--sidebar-width)] bg-background border-r border-border/[0.06]">
       {/* Logo */}
       <div className="px-6 pt-7 pb-5">
         <span className="font-serif text-lg font-bold tracking-tight text-foreground">AONEX</span>
@@ -107,12 +104,11 @@ export default function AppSidebar() {
               className={[
                 "relative flex items-center gap-3 rounded-lg px-3 h-10 text-sm transition-all duration-150",
                 active
-                  ? "nav-active bg-primary/5"
+                  ? "nav-active bg-primary/5 text-primary"
                   : locked
                     ? "pointer-events-none opacity-40"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
               ].join(" ")}
-              style={active ? { color: "hsl(var(--primary))" } : undefined}
             >
               <Icon size={15} className="shrink-0" />
               <span className="flex-1 font-medium">{label}</span>
@@ -126,11 +122,8 @@ export default function AppSidebar() {
 
       {/* User */}
       <div className="px-4 py-4 flex items-center gap-3">
-        <div
-          className="size-8 rounded-full flex items-center justify-center shrink-0 border border-border/[0.08]"
-          style={{ background: "hsl(var(--primary) / 0.1)" }}
-        >
-          <span className="text-[11px] font-bold" style={{ color: "hsl(var(--primary))" }}>
+        <div className="size-8 rounded-full flex items-center justify-center shrink-0 border border-border/[0.08] bg-primary/10">
+          <span className="text-[11px] font-bold text-primary">
             {getInitials(displayName)}
           </span>
         </div>

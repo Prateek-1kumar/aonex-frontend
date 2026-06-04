@@ -18,14 +18,7 @@ export default function TopBar({ tabs = [], pendingCount = 0 }: TopBarProps) {
   const pathname = usePathname();
 
   return (
-    <header
-      className="sticky top-0 z-30 flex items-center justify-between border-b border-border/[0.06] px-6"
-      style={{
-        height: "var(--topbar-height)",
-        background: "hsl(var(--background) / 0.9)",
-        backdropFilter: "blur(12px)",
-      }}
-    >
+    <header className="sticky top-0 z-30 flex items-center justify-between h-[var(--topbar-height)] px-6 border-b border-border/[0.06] bg-background/90 backdrop-blur-md">
       {/* Sub-tabs */}
       <nav className="flex items-center gap-1 h-full">
         {tabs.map((tab) => {
@@ -46,7 +39,7 @@ export default function TopBar({ tabs = [], pendingCount = 0 }: TopBarProps) {
             >
               {tab.label}
               {isActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/100" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary" />
               )}
             </Link>
           );
@@ -55,18 +48,18 @@ export default function TopBar({ tabs = [], pendingCount = 0 }: TopBarProps) {
 
       {/* Global actions */}
       <div className="flex items-center gap-1">
-        <button className="flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors">
+        <button className="flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors">
           <Search size={15} />
         </button>
 
-        <button className="relative flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors">
+        <button className="relative flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors">
           <Bell size={15} />
           {pendingCount > 0 && (
-            <span className="absolute top-1 right-1 size-[6px] rounded-full bg-primary/100" />
+            <span className="absolute top-1 right-1 size-[6px] rounded-full bg-primary" />
           )}
         </button>
 
-        <button className="flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors">
+        <button className="flex items-center justify-center size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors">
           <Settings size={15} />
         </button>
 
@@ -74,7 +67,7 @@ export default function TopBar({ tabs = [], pendingCount = 0 }: TopBarProps) {
 
         <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">
           Partner with{" "}
-          <span className="text-primary/100">Aonami</span>
+          <span className="text-primary">Aonami</span>
         </span>
       </div>
     </header>

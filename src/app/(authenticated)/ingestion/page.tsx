@@ -129,8 +129,8 @@ export default function IngestionPage() {
         <div className={[
           "mb-6 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
           toast.type === "success"
-            ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-            : "bg-red-500/10 border border-red-500/20 text-red-400",
+            ? "bg-success/10 border border-success/20 text-success"
+            : "bg-danger/10 border border-danger/20 text-danger",
         ].join(" ")}>
           {toast.type === "success"
             ? <CheckCircle2 size={15} className="shrink-0" />
@@ -151,7 +151,7 @@ export default function IngestionPage() {
             "col-span-3 flex flex-col items-center justify-center gap-5 rounded-xl border transition-all duration-200 cursor-pointer min-h-[340px]",
             dragging
               ? "border-primary/40 bg-primary/5"
-              : "border-border/[0.08] bg-card hover:border-border/[0.14] hover:bg-white/[0.02]",
+              : "border-border/[0.08] bg-card hover:border-border/[0.14] hover:bg-surface-hover",
           ].join(" ")}
         >
           <input
@@ -163,7 +163,7 @@ export default function IngestionPage() {
           />
           <div className={[
             "size-16 rounded-2xl flex items-center justify-center transition-colors",
-            dragging ? "bg-primary/15 text-primary/100" : "bg-white/[0.05] text-muted-foreground",
+            dragging ? "bg-primary/15 text-primary" : "bg-surface text-muted-foreground",
           ].join(" ")}>
             <Upload size={28} strokeWidth={1.5} />
           </div>
@@ -173,13 +173,13 @@ export default function IngestionPage() {
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Drag &amp; drop{" "}
-              <span className="text-primary/100">PDF</span>
+              <span className="text-primary">PDF</span>
               {", "}
-              <span className="text-primary/100">CSV</span>
+              <span className="text-primary">CSV</span>
               {", "}
-              <span className="text-primary/100">Excel</span>
+              <span className="text-primary">Excel</span>
               {" or "}
-              <span className="text-primary/100">Numbers</span>
+              <span className="text-primary">Numbers</span>
               {" to begin neural orchestration"}
             </p>
             <p className="mt-3 text-xs text-muted-foreground/50 uppercase tracking-widest">
@@ -201,7 +201,7 @@ export default function IngestionPage() {
           {/* External link */}
           <div className="rounded-xl border border-border/[0.08] bg-card p-5 flex-1">
             <div className="flex items-center gap-2 mb-4">
-              <Link2 size={14} className="text-primary/100" />
+              <Link2 size={14} className="text-primary" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 External Link
               </p>
@@ -213,7 +213,7 @@ export default function IngestionPage() {
                     {detected.name} parser
                   </span>
                   {detected.browserRequired && (
-                    <span className="text-[10px] text-amber-300/80 flex items-center gap-1">
+                    <span className="text-[10px] text-warning/80 flex items-center gap-1">
                       <Monitor size={10} />
                       Browser render
                     </span>
@@ -229,7 +229,7 @@ export default function IngestionPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handleUrl(); }}
                 placeholder="https://amazon.com/dp/…"
-                className="w-full bg-white/[0.04] border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
+                className="w-full bg-surface border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
               />
               <div className="flex gap-2">
                 <input
@@ -238,12 +238,12 @@ export default function IngestionPage() {
                   onChange={(e) => setCategoryHint(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void handleUrl(); }}
                   placeholder="Category hint e.g., 'Running Shoes' (Optional)"
-                  className="flex-1 bg-white/[0.04] border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
+                  className="flex-1 bg-surface border border-border/[0.08] rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 transition-colors min-w-0"
                 />
                 <button
                   onClick={() => void handleUrl()}
                   disabled={busy === "url" || !url.trim()}
-                  className="px-4 rounded-lg bg-primary/10 text-primary/100 hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+                  className="px-4 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
                 >
                   <Plus size={16} />
                 </button>
@@ -257,7 +257,7 @@ export default function IngestionPage() {
           {/* Connectors */}
           <div className="rounded-xl border border-border/[0.08] bg-card p-5 flex-1">
             <div className="flex items-center gap-2 mb-4">
-              <Plus size={14} className="text-primary/100" />
+              <Plus size={14} className="text-primary" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Quick Orchestration
               </p>
@@ -272,8 +272,8 @@ export default function IngestionPage() {
                   className={[
                     "relative rounded-lg px-2 py-2.5 text-xs font-semibold transition-all duration-150",
                     mp.live
-                      ? "bg-white/[0.04] border border-border/[0.08] text-foreground/80 hover:bg-white/[0.07] hover:border-border/[0.14] disabled:opacity-50"
-                      : "bg-white/[0.02] border border-border/[0.04] text-muted-foreground/30 cursor-default",
+                      ? "bg-surface border border-border/[0.08] text-foreground/80 hover:bg-surface-hover hover:border-border/[0.14] disabled:opacity-50"
+                      : "bg-surface border border-border/[0.04] text-muted-foreground/30 cursor-default",
                   ].join(" ")}
                 >
                   {mp.label}
@@ -307,7 +307,7 @@ export default function IngestionPage() {
                 <div className="flex items-center gap-3">
                   <div className={[
                     "size-1.5 rounded-full",
-                    c.status === "active" ? "bg-emerald-400" : "bg-amber-400",
+                    c.status === "active" ? "bg-success" : "bg-warning",
                   ].join(" ")} />
                   <span className="text-sm font-medium capitalize text-foreground/90">
                     {c.marketplace}
@@ -321,7 +321,7 @@ export default function IngestionPage() {
                 <button
                   onClick={() => void api.triggerSync(c.marketplace).then(loadConns)}
                   disabled={c.status !== "active" || busy !== null}
-                  className="text-xs font-semibold text-muted-foreground hover:text-primary/100 disabled:opacity-30 transition-colors uppercase tracking-wider"
+                  className="text-xs font-semibold text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors uppercase tracking-wider"
                 >
                   Sync now
                 </button>

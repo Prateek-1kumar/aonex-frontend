@@ -11,7 +11,7 @@ interface ActionBarProps {
 
 function KeyHint({ letter }: { letter: string }) {
   return (
-    <span className="inline-flex items-center justify-center size-4 rounded bg-white/[0.06] border border-border/[0.12] text-[9px] font-bold text-muted-foreground/60 font-mono ml-1">
+    <span className="inline-flex items-center justify-center size-4 rounded bg-surface border border-border/[0.12] text-[9px] font-bold text-muted-foreground/60 font-mono ml-1">
       {letter}
     </span>
   );
@@ -23,7 +23,7 @@ export function ActionBar({ onApprove, onReject, onSkip, onLink, canApprove, bus
       <button
         onClick={onApprove}
         disabled={!canApprove || busy}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400/90 text-sm font-semibold hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-success/10 border border-success/20 text-success/90 text-sm font-semibold hover:bg-success/20 transition-colors disabled:opacity-40"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
         Approve <KeyHint letter="A" />
@@ -32,7 +32,7 @@ export function ActionBar({ onApprove, onReject, onSkip, onLink, canApprove, bus
       <button
         onClick={onReject}
         disabled={busy}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400/80 text-sm font-semibold hover:bg-red-500/20 transition-colors disabled:opacity-40"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-danger/10 border border-danger/20 text-danger/80 text-sm font-semibold hover:bg-danger/20 transition-colors disabled:opacity-40"
       >
         <XCircle size={14} />
         Reject <KeyHint letter="R" />
@@ -52,7 +52,7 @@ export function ActionBar({ onApprove, onReject, onSkip, onLink, canApprove, bus
       <button
         onClick={onSkip}
         disabled={busy}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/[0.03] border border-border/[0.08] text-muted-foreground/60 text-sm font-semibold hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface border border-border/[0.08] text-muted-foreground/60 text-sm font-semibold hover:bg-surface-hover transition-colors disabled:opacity-40"
       >
         <SkipForward size={14} />
         Skip <KeyHint letter="S" />

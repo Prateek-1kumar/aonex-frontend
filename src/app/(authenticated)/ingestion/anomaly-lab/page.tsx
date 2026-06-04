@@ -311,7 +311,7 @@ function AnomalyLabPageContent() {
             }
           }}
           disabled={initialLoading}
-          className="size-9 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center disabled:opacity-40"
+          className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center disabled:opacity-40"
           aria-label="Refresh queue"
         >
           {initialLoading ? (
@@ -331,8 +331,8 @@ function AnomalyLabPageContent() {
           className={[
             "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm border",
             toast.type === "success"
-              ? "bg-card border-emerald-500/20 text-emerald-400"
-              : "bg-card border-red-500/20 text-red-400",
+              ? "bg-card border-success/20 text-success"
+              : "bg-card border-danger/20 text-danger",
           ].join(" ")}
         >
           {toast.type === "success" ? (
@@ -347,7 +347,7 @@ function AnomalyLabPageContent() {
       {/* Empty state */}
       {total === 0 || index >= total ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <CheckCircle2 size={40} className="text-emerald-400 mb-4" strokeWidth={1.5} />
+          <CheckCircle2 size={40} className="text-success mb-4" strokeWidth={1.5} />
           <p className="font-serif text-lg font-semibold text-foreground/80">
             All clear — nothing staged
           </p>
@@ -384,10 +384,10 @@ function AnomalyLabPageContent() {
             ) : (
               /* Detail loading shimmer */
               <div className="rounded-xl border border-border/[0.08] bg-card p-5 space-y-3 animate-pulse">
-                <div className="h-3 rounded bg-white/[0.05] w-1/3" />
-                <div className="h-8 rounded bg-white/[0.04]" />
-                <div className="h-8 rounded bg-white/[0.04]" />
-                <div className="h-8 rounded bg-white/[0.04]" />
+                <div className="h-3 rounded bg-surface w-1/3" />
+                <div className="h-8 rounded bg-surface" />
+                <div className="h-8 rounded bg-surface" />
+                <div className="h-8 rounded bg-surface" />
               </div>
             )}
 

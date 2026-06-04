@@ -21,7 +21,7 @@ export default function LockedSection({ title, subtitle, message }: LockedSectio
       {/* Lock card */}
       <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center text-center max-w-xs">
-          <div className="size-14 rounded-2xl bg-white/[0.04] border border-border/[0.08] flex items-center justify-center mb-5">
+          <div className="size-14 rounded-2xl bg-surface border border-border/[0.08] flex items-center justify-center mb-5">
             <Lock size={22} className="text-muted-foreground/40" />
           </div>
 
@@ -33,7 +33,7 @@ export default function LockedSection({ title, subtitle, message }: LockedSectio
 
           <Link
             href="/ingestion"
-            className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary/100 text-xs font-semibold uppercase tracking-widest hover:bg-primary/15 transition-colors"
+            className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest hover:bg-primary/15 transition-colors"
           >
             Go to Ingestion Terminal
           </Link>

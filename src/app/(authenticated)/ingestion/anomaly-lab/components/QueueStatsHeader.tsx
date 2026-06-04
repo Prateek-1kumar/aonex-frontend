@@ -20,7 +20,7 @@ export function QueueStatsHeader({ stats, position, total }: QueueStatsHeaderPro
           {position} <span className="text-muted-foreground/40 font-normal">/</span> {total}
         </span>
         {total > 0 && (
-          <div className="w-20 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="w-20 h-1 rounded-full bg-surface overflow-hidden">
             <div
               className="h-full rounded-full bg-primary/60 transition-all duration-300"
               style={{ width: `${pct}%` }}
@@ -42,7 +42,7 @@ export function QueueStatsHeader({ stats, position, total }: QueueStatsHeaderPro
               {Object.entries(stats.byReason).map(([reason, count]) => (
                 <span
                   key={reason}
-                  className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300/80 text-[10px] font-semibold"
+                  className="px-1.5 py-0.5 rounded bg-warning/10 border border-warning/20 text-warning/80 text-[10px] font-semibold"
                 >
                   {reason} ×{count}
                 </span>
@@ -60,7 +60,7 @@ export function QueueStatsHeader({ stats, position, total }: QueueStatsHeaderPro
                 {Object.entries(stats.bySource).map(([src, count]) => (
                   <span
                     key={src}
-                    className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-border/[0.08] text-muted-foreground/70 text-[10px] font-semibold"
+                    className="px-1.5 py-0.5 rounded bg-surface border border-border/[0.08] text-muted-foreground/70 text-[10px] font-semibold"
                   >
                     {src} ×{count}
                   </span>
@@ -77,17 +77,17 @@ export function QueueStatsHeader({ stats, position, total }: QueueStatsHeaderPro
               Age
             </span>
             {stats.byAge.today > 0 && (
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300/80 text-[10px] font-semibold">
+              <span className="px-1.5 py-0.5 rounded bg-success/10 border border-success/20 text-success/80 text-[10px] font-semibold">
                 Today ×{stats.byAge.today}
               </span>
             )}
             {stats.byAge.week > 0 && (
-              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-border/[0.08] text-muted-foreground/70 text-[10px] font-semibold">
+              <span className="px-1.5 py-0.5 rounded bg-surface border border-border/[0.08] text-muted-foreground/70 text-[10px] font-semibold">
                 Week ×{stats.byAge.week}
               </span>
             )}
             {stats.byAge.older > 0 && (
-              <span className="px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-300/70 text-[10px] font-semibold">
+              <span className="px-1.5 py-0.5 rounded bg-danger/10 border border-danger/20 text-danger/70 text-[10px] font-semibold">
                 Older ×{stats.byAge.older}
               </span>
             )}

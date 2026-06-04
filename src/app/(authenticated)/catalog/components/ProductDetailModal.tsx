@@ -200,7 +200,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
     >
       <div
@@ -221,7 +221,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="size-9 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center"
+            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center"
             aria-label="Close"
           >
             <X size={15} />
@@ -238,7 +238,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
           )}
 
           {loadError && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
               <AlertCircle size={15} />
               {loadError}
             </div>
@@ -275,7 +275,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
                   />
                   Raw winning_values JSON
                 </summary>
-                <pre className="mt-2 text-[10px] leading-tight bg-black/30 rounded-lg p-3 overflow-x-auto max-h-72 text-foreground/60 border border-border/[0.06]">
+                <pre className="mt-2 text-[10px] leading-tight bg-code rounded-lg p-3 overflow-x-auto max-h-72 text-foreground/60 border border-border/[0.06]">
                   {JSON.stringify(product.winning_values, null, 2)}
                 </pre>
               </details>
@@ -289,17 +289,17 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => copy("Product ID", product.product_id)}
-                className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-xs text-foreground/70 hover:bg-white/[0.07] flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-md bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5"
               >
-                {copied === "Product ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copied === "Product ID" ? <Check size={12} className="text-success" /> : <Copy size={12} />}
                 Product ID
               </button>
               {product.primary_identifier && (
                 <button
                   onClick={() => copy("Primary ID", product.primary_identifier)}
-                  className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-xs text-foreground/70 hover:bg-white/[0.07] flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-md bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5"
                 >
-                  {copied === "Primary ID" ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {copied === "Primary ID" ? <Check size={12} className="text-success" /> : <Copy size={12} />}
                   Primary Identifier
                 </button>
               )}
@@ -318,7 +318,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
                     <button
                       onClick={() => void handleDelete()}
                       disabled={deleting}
-                      className="px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-semibold hover:bg-red-500/30 disabled:opacity-40 flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-md bg-danger/20 border border-danger/40 text-danger text-xs font-semibold hover:bg-danger/30 disabled:opacity-40 flex items-center gap-1.5"
                     >
                       {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                       Confirm delete
@@ -328,7 +328,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
                   <button
                     onClick={() => setConfirmDelete(true)}
                     disabled={deleting}
-                    className="px-3 py-1.5 rounded-md bg-white/[0.04] border border-border/[0.08] text-red-400/80 text-xs font-semibold hover:bg-red-500/10 disabled:opacity-40 flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-md bg-surface border border-border/[0.08] text-danger/80 text-xs font-semibold hover:bg-danger/10 disabled:opacity-40 flex items-center gap-1.5"
                   >
                     <Trash2 size={12} />
                     Delete
@@ -393,7 +393,7 @@ function ProductHeader({
               onClick={() => onCopy("GTIN", gtin)}
               className="text-muted-foreground/50 hover:text-foreground/80"
             >
-              {copied === "GTIN" ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              {copied === "GTIN" ? <Check size={11} className="text-success" /> : <Copy size={11} />}
             </button>
           )}
         </InfoTile>
@@ -443,7 +443,7 @@ function WinningValuesSection({
 
   return (
     <Section title="Winning Values">
-      <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] divide-y divide-border/[0.04]">
+      <div className="rounded-lg border border-border/[0.06] bg-surface divide-y divide-border/[0.04]">
         {attrs.map((attr) => {
           const extracted = extractWinningValue(wv, attr);
           const prov = provenance[attr];
@@ -520,7 +520,7 @@ function AttributeRow({
             </span>
           )}
           {prov.error && (
-            <span className="text-[10px] text-red-400/70">{prov.error}</span>
+            <span className="text-[10px] text-danger/70">{prov.error}</span>
           )}
           {prov.data && (
             <ProvenanceInline data={prov.data} />
@@ -533,7 +533,7 @@ function AttributeRow({
 
 function ProvenanceInline({ data }: { data: AttributeProvenance }) {
   return (
-    <div className="rounded-md border border-border/[0.08] bg-black/20 px-2.5 py-2 text-[10px] space-y-1">
+    <div className="rounded-md border border-border/[0.08] bg-surface px-2.5 py-2 text-[10px] space-y-1">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-muted-foreground/50">Winner source:</span>
         <span className="font-semibold text-foreground/80">
@@ -559,7 +559,7 @@ function ProvenanceInline({ data }: { data: AttributeProvenance }) {
         </div>
       )}
       {data.winner == null && (
-        <div className="text-amber-400/70 italic">No winning observation for this attribute.</div>
+        <div className="text-warning/70 italic">No winning observation for this attribute.</div>
       )}
     </div>
   );
@@ -583,7 +583,7 @@ function ImagesSection({ product }: { product: CatalogProductView }) {
             src={img.url}
             alt={img.alt_text ?? `Image ${i + 1}`}
             title={img.role ?? undefined}
-            className="size-20 rounded-lg object-cover border border-border/[0.08] shrink-0 bg-white/[0.03]"
+            className="size-20 rounded-lg object-cover border border-border/[0.08] shrink-0 bg-surface"
             loading="lazy"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -636,10 +636,10 @@ function ChannelPricingBlock({
   const locales = Object.entries(byLocale);
 
   return (
-    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] overflow-hidden">
+    <div className="rounded-lg border border-border/[0.06] bg-surface overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-surface-hover transition-colors"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[10px] font-mono text-muted-foreground/50 truncate">
@@ -725,7 +725,7 @@ function InfoTile({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border/[0.06] bg-white/[0.02] px-3 py-2">
+    <div className="rounded-lg border border-border/[0.06] bg-surface px-3 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">{label}</p>
       <div className="mt-0.5 flex items-baseline justify-between gap-2">
         <p className="text-sm font-semibold truncate text-foreground/90" title={value}>

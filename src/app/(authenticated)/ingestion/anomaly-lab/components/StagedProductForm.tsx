@@ -102,10 +102,10 @@ function extractPresent(
 function SourceBadge({ source, confidence }: { source: string | undefined; confidence: string | undefined }) {
   if (!source && !confidence) return null;
   return (
-    <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-white/[0.04] border border-border/[0.08] text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+    <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-surface border border-border/[0.08] text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
       {source && <span>{source}</span>}
       {source && confidence && <span className="text-border/[0.4]">·</span>}
-      {confidence && <span className="text-emerald-400/70">{confidence}</span>}
+      {confidence && <span className="text-success/70">{confidence}</span>}
     </span>
   );
 }
@@ -129,7 +129,7 @@ export function StagedProductForm({
         <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">
           Source
         </span>
-        <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-border/[0.08] text-[10px] font-semibold text-muted-foreground/70">
+        <span className="px-1.5 py-0.5 rounded bg-surface border border-border/[0.08] text-[10px] font-semibold text-muted-foreground/70">
           {detail.sourceKind}
         </span>
         <span className="text-[9px] font-mono text-muted-foreground/30 truncate max-w-[200px]">
@@ -146,9 +146,9 @@ export function StagedProductForm({
         if (isMissing) {
           return (
             <div key={field}>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400/80 mb-1">
+              <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-warning/80 mb-1">
                 {FIELD_LABELS[field] ?? field}
-                <span className="ml-1 text-amber-500/60 normal-case tracking-normal font-normal">
+                <span className="ml-1 text-warning/60 normal-case tracking-normal font-normal">
                   — required
                 </span>
               </label>
@@ -158,14 +158,14 @@ export function StagedProductForm({
                 onChange={(e) => onChange(field, e.target.value)}
                 placeholder={`Enter ${FIELD_LABELS[field] ?? field}…`}
                 className={[
-                  "w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
+                  "w-full bg-surface border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
                   isStillMissing
-                    ? "border-red-500/60 ring-1 ring-red-500/30 focus:border-red-400/80"
-                    : "border-amber-500/30 focus:border-amber-400/50",
+                    ? "border-danger/60 ring-1 ring-danger/30 focus:border-danger/80"
+                    : "border-warning/30 focus:border-warning/50",
                 ].join(" ")}
               />
               {isStillMissing && (
-                <p className="mt-1 text-[10px] text-red-400/80">This field is required to approve.</p>
+                <p className="mt-1 text-[10px] text-danger/80">This field is required to approve.</p>
               )}
             </div>
           );
@@ -177,7 +177,7 @@ export function StagedProductForm({
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60 mb-1">
               {FIELD_LABELS[field] ?? field}
             </p>
-            <div className="flex items-center px-3 py-2 rounded-lg bg-white/[0.02] border border-border/[0.06]">
+            <div className="flex items-center px-3 py-2 rounded-lg bg-surface border border-border/[0.06]">
               <span className="text-sm text-foreground/80">
                 {present?.value ?? <span className="text-muted-foreground/40 italic">—</span>}
               </span>
@@ -193,9 +193,9 @@ export function StagedProductForm({
       {missing.has("pricing.primary") ? (
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400/80 mb-1">
+            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-warning/80 mb-1">
               Base Price
-              <span className="ml-1 text-amber-500/60 normal-case tracking-normal font-normal">
+              <span className="ml-1 text-warning/60 normal-case tracking-normal font-normal">
                 — required
               </span>
             </label>
@@ -206,17 +206,17 @@ export function StagedProductForm({
               onChange={(e) => onChange("price", e.target.value)}
               placeholder="e.g. 79999"
               className={[
-                "w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
+                "w-full bg-surface border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
                 stillMissing.includes("pricing.primary")
-                  ? "border-red-500/60 ring-1 ring-red-500/30 focus:border-red-400/80"
-                  : "border-amber-500/30 focus:border-amber-400/50",
+                  ? "border-danger/60 ring-1 ring-danger/30 focus:border-danger/80"
+                  : "border-warning/30 focus:border-warning/50",
               ].join(" ")}
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400/80 mb-1">
+            <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-warning/80 mb-1">
               Currency
-              <span className="ml-1 text-amber-500/60 normal-case tracking-normal font-normal">
+              <span className="ml-1 text-warning/60 normal-case tracking-normal font-normal">
                 — required
               </span>
             </label>
@@ -227,15 +227,15 @@ export function StagedProductForm({
               onChange={(e) => onChange("currency", e.target.value.toUpperCase())}
               placeholder="INR"
               className={[
-                "w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
+                "w-full bg-surface border rounded-lg px-3 py-2 text-sm text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none transition-colors",
                 stillMissing.includes("pricing.primary")
-                  ? "border-red-500/60 ring-1 ring-red-500/30 focus:border-red-400/80"
-                  : "border-amber-500/30 focus:border-amber-400/50",
+                  ? "border-danger/60 ring-1 ring-danger/30 focus:border-danger/80"
+                  : "border-warning/30 focus:border-warning/50",
               ].join(" ")}
             />
           </div>
           {stillMissing.includes("pricing.primary") && (
-            <p className="text-[10px] text-red-400/80">
+            <p className="text-[10px] text-danger/80">
               Both price and currency are required to approve.
             </p>
           )}
@@ -248,7 +248,7 @@ export function StagedProductForm({
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60 mb-1">
                 Price
               </p>
-              <div className="flex items-center px-3 py-2 rounded-lg bg-white/[0.02] border border-border/[0.06]">
+              <div className="flex items-center px-3 py-2 rounded-lg bg-surface border border-border/[0.06]">
                 <span className="text-sm text-foreground/80">{present.value}</span>
                 <SourceBadge source={present.source} confidence={present.confidence} />
               </div>
