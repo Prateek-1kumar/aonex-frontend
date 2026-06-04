@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { getDisplayPrice } from "./lib/price";
+import { catalogStatusBadge } from "@/lib/status";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
@@ -385,14 +386,9 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => voi
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    active: { label: "Active", cls: "bg-emerald-500/12 text-emerald-300 border-emerald-500/25" },
-    draft: { label: "Draft", cls: "bg-amber-500/12 text-amber-300 border-amber-500/25" },
-    archived: { label: "Archived", cls: "bg-rose-500/12 text-rose-300 border-rose-500/25" },
-  };
-  const s = map[status] ?? { label: status, cls: "bg-white/[0.05] text-foreground/60 border-border/20" };
+  const s = catalogStatusBadge(status);
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${s.cls}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${s.className}`}>
       {s.label}
     </span>
   );
