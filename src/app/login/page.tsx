@@ -3,7 +3,9 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { api, setToken } from "@/lib/api";
+import ThemeToggle from "@/components/theme-toggle";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
@@ -15,6 +17,12 @@ const GOOGLE_ERRORS: Record<string, string> = {
   session_expired: "Your session expired. Please sign in again.",
 };
 
+const HIGHLIGHTS = [
+  "AI extraction from PDF, URL, or CSV — zero manual entry",
+  "Enrichment, benchmarking, and sync in one engine",
+  "Live sync across global marketplaces with health monitoring",
+];
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -24,6 +32,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const errorMessage = err ?? (oauthError ? GOOGLE_ERRORS[oauthError] ?? null : null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,68 +51,127 @@ function LoginForm() {
   }
 
   return (
-    <main className="mx-auto max-w-sm p-12">
-      <h1 className="font-serif text-3xl font-medium tracking-tight">Sign in</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Welcome back to Aonex.</p>
+    <div className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground">
+      {/* ── Brand panel ── */}
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-border/[0.08] p-12">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 -left-32 size-[520px] rounded-full bg-primary/20 blur-[130px]" />
+          <div className="absolute bottom-[-6rem] right-[-4rem] size-[400px] rounded-full bg-primary/10 blur-[130px]" />
+        </div>
 
-      <a
-        href={`${API}/api/auth/google`}
-        className="mt-6 flex w-full items-center justify-center gap-3 border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-      >
-        <GoogleIcon />
-        Continue with Google
-      </a>
+        <div className="relative">
+          <span className="font-serif text-lg font-bold tracking-tight text-foreground">AONEX</span>
+          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Autonomous Commerce Engine
+          </p>
+        </div>
 
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground uppercase tracking-widest">or</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
+        <div className="relative max-w-md">
+          <h2 className="font-serif text-4xl font-bold leading-[1.1] tracking-tight text-foreground">
+            From raw data to <span className="text-primary">market revenue</span> in one engine.
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Aonex ingests your supplier data, enriches it with agentic AI, and distributes it
+            across global marketplaces — autonomously.
+          </p>
+          <ul className="mt-8 space-y-3">
+            {HIGHLIGHTS.map((h) => (
+              <li key={h} className="flex items-start gap-3 text-sm text-foreground/80">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <Check size={12} strokeWidth={3} />
+                </span>
+                {h}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <label className="block text-sm">
-          <span className="font-medium">Email</span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Password</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </label>
+        <p className="relative text-[11px] text-muted-foreground/60">
+          © 2026 Aonex · All rights reserved
+        </p>
+      </aside>
 
-        {(err ?? (oauthError ? GOOGLE_ERRORS[oauthError] : null)) && (
-          <p className="text-sm text-red-600">{err ?? GOOGLE_ERRORS[oauthError!]}</p>
-        )}
+      {/* ── Form panel ── */}
+      <main className="relative flex items-center justify-center p-6 sm:p-12">
+        <div className="absolute top-5 right-5">
+          <ThemeToggle className="size-9 rounded-lg border border-border/[0.08] text-muted-foreground hover:text-foreground hover:bg-surface-hover" />
+        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-transparent hover:text-primary disabled:opacity-50"
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+        <div className="w-full max-w-sm">
+          {/* Mobile wordmark */}
+          <div className="mb-8 lg:hidden">
+            <span className="font-serif text-lg font-bold tracking-tight text-foreground">AONEX</span>
+          </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        No account?{" "}
-        <Link href="/signup" className="font-medium text-foreground underline-offset-4 hover:underline">
-          Create one
-        </Link>
-      </p>
-    </main>
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">Sign in</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Welcome back to Aonex.</p>
+
+          <a
+            href={`${API}/api/auth/google`}
+            className="mt-7 flex w-full items-center justify-center gap-3 rounded-lg border border-border/[0.12] bg-surface px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface-hover transition-colors"
+          >
+            <GoogleIcon />
+            Continue with Google
+          </a>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border/[0.1]" />
+            <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.18em]">or</span>
+            <div className="h-px flex-1 bg-border/[0.1]" />
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-4">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</span>
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                className="mt-1.5 w-full rounded-lg border border-border/[0.1] bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-colors"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Password</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="mt-1.5 w-full rounded-lg border border-border/[0.1] bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-colors"
+              />
+            </label>
+
+            {errorMessage && (
+              <div className="flex items-center gap-2 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">
+                <AlertCircle size={14} className="shrink-0" />
+                {errorMessage}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-[0_10px_40px_-12px_hsl(var(--primary)/0.7)]"
+            >
+              {loading && <Loader2 size={15} className="animate-spin" />}
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+
+          <p className="mt-7 text-center text-sm text-muted-foreground">
+            No account?{" "}
+            <Link href="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">
+              Create one
+            </Link>
+          </p>
+        </div>
+      </main>
+    </div>
   );
 }
 

@@ -196,8 +196,8 @@ function CatalogPageContent() {
       <div className="mb-7 flex items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl font-bold text-foreground leading-none">Master Catalog</h1>
-          <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/70">
-            SKU Intelligence &amp; Distribution Hub
+          <p className="mt-2 text-sm text-muted-foreground">
+            Every approved product — health, status, and pricing at a glance.
           </p>
         </div>
       </div>

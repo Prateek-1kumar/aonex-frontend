@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor } from "lucide-react";
+import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor, Loader2, Store } from "lucide-react";
 import Nango from "@nangohq/frontend";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -119,8 +119,8 @@ export default function IngestionPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-serif text-4xl font-bold text-foreground">Ingestion Terminal</h1>
-        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          Data Orchestration & Neural Mapping
+        <p className="mt-2 text-sm text-muted-foreground">
+          Bring product data into Aonex — from a file, a marketplace link, or a connected store.
         </p>
       </div>
 
@@ -162,34 +162,35 @@ export default function IngestionPage() {
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
           />
           <div className={[
-            "size-16 rounded-2xl flex items-center justify-center transition-colors",
-            dragging ? "bg-primary/15 text-primary" : "bg-surface text-muted-foreground",
+            "size-16 rounded-2xl flex items-center justify-center transition-all duration-200",
+            dragging ? "bg-primary/15 text-primary ring-4 ring-primary/10" : "bg-surface text-muted-foreground",
           ].join(" ")}>
-            <Upload size={28} strokeWidth={1.5} />
+            {busy === "file"
+              ? <Loader2 size={28} className="animate-spin" />
+              : <Upload size={28} strokeWidth={1.5} />}
           </div>
           <div className="text-center">
             <p className="font-serif text-xl font-semibold text-foreground/90">
-              {busy === "file" ? "Processing…" : "Ingest Manifest"}
+              {busy === "file" ? "Processing…" : dragging ? "Drop to ingest" : "Upload a product file"}
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Drag &amp; drop{" "}
-              <span className="text-primary">PDF</span>
-              {", "}
-              <span className="text-primary">CSV</span>
-              {", "}
-              <span className="text-primary">Excel</span>
-              {" or "}
-              <span className="text-primary">Numbers</span>
-              {" to begin neural orchestration"}
+              Drag &amp; drop, or click to browse
             </p>
-            <p className="mt-3 text-xs text-muted-foreground/50 uppercase tracking-widest">
-              — or click to browse —
-            </p>
+            <div className="mt-4 flex items-center justify-center gap-1.5">
+              {["PDF", "CSV", "Excel", "Numbers"].map((t) => (
+                <span
+                  key={t}
+                  className="rounded-md border border-border/[0.08] bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
             <a
               href="/aonex-catalog-template.csv"
               download
               onClick={(e) => e.stopPropagation()}
-              className="mt-4 inline-block text-xs font-medium text-primary underline underline-offset-2"
+              className="mt-5 inline-block text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80"
             >
               Download CSV template
             </a>
@@ -219,7 +220,7 @@ export default function IngestionPage() {
                     </span>
                   )}
                   <span className="text-[10px] text-muted-foreground/40">
-                    Phase 7 per-site parser will run first
+                    Site-specific parser runs first
                   </span>
                 </div>
               )}
@@ -257,12 +258,12 @@ export default function IngestionPage() {
           {/* Connectors */}
           <div className="rounded-xl border border-border/[0.08] bg-card p-5 flex-1">
             <div className="flex items-center gap-2 mb-4">
-              <Plus size={14} className="text-primary" />
+              <Store size={14} className="text-primary" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                Quick Orchestration
+                Connect a Store
               </p>
             </div>
-            <p className="text-sm font-medium text-foreground/80 mb-4">Connect Marketplace</p>
+            <p className="text-sm text-muted-foreground mb-4">Sync products automatically from your marketplace.</p>
             <div className="grid grid-cols-3 gap-2">
               {MARKETPLACES.map((mp) => (
                 <button
