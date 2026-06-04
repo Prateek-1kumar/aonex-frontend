@@ -15,6 +15,8 @@ import {
   DollarSign,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { formatPrice, formatDate, formatDateTime } from "@/lib/format";
+import { catalogStatusBadge } from "@/lib/status";
 import type { CatalogProductView, AttributeProvenance, PricingLeaf } from "../lib/catalog-types";
 
 interface Props {
@@ -108,13 +110,6 @@ function extractImages(
 function shortId(id: string): string {
   // Shorten a UUID to first 8 chars for display
   return id.length > 12 ? `…${id.slice(-8)}` : id;
-}
-
-// Status badge colours
-function statusTone(status: string): string {
-  if (status === "active") return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
-  if (status === "archived") return "bg-red-500/10 text-red-300 border-red-500/20";
-  return "bg-amber-500/10 text-amber-300 border-amber-500/20";
 }
 
 // ---------------------------------------------------------------------------
@@ -216,8 +211,8 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur">
           <div className="flex items-center gap-3 min-w-0">
             {product && (
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusTone(product.status)}`}>
-                {product.status}
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${catalogStatusBadge(product.status).className}`}>
+                {catalogStatusBadge(product.status).label}
               </span>
             )}
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 truncate font-mono">
@@ -404,18 +399,8 @@ function ProductHeader({
         </InfoTile>
         <InfoTile label="Primary Identifier" value={product.primary_identifier} />
         <InfoTile label="Schema Version" value={product.schema_version} />
-        <InfoTile
-          label="Created"
-          value={new Date(product.created_at).toLocaleDateString(undefined, {
-            year: "numeric", month: "short", day: "numeric",
-          })}
-        />
-        <InfoTile
-          label="Updated"
-          value={new Date(product.updated_at).toLocaleDateString(undefined, {
-            year: "numeric", month: "short", day: "numeric",
-          })}
-        />
+        <InfoTile label="Created" value={formatDate(product.created_at)} />
+        <InfoTile label="Updated" value={formatDate(product.updated_at)} />
         <InfoTile label="Consistency" value={product.consistency} />
       </div>
     </div>
@@ -565,7 +550,7 @@ function ProvenanceInline({ data }: { data: AttributeProvenance }) {
       </div>
       {data.observation_observed_at && (
         <div className="text-muted-foreground/40">
-          Observed: {new Date(data.observation_observed_at).toLocaleString()}
+          Observed: {formatDateTime(data.observation_observed_at)}
         </div>
       )}
       {data.artifact_id && (
@@ -665,16 +650,11 @@ function ChannelPricingBlock({
           </span>
         </div>
         {/* Show first locale's price as preview */}
-        {locales[0] && (() => {
-          const n = Number(locales[0][1].primaryAmount);
-          return (
-            <span className="text-xs font-semibold tabular-nums text-foreground/80 shrink-0">
-              {Number.isFinite(n)
-                ? `${locales[0][1].currency} ${n.toLocaleString()}`
-                : "—"}
-            </span>
-          );
-        })()}
+        {locales[0] && (
+          <span className="text-xs font-semibold tabular-nums text-foreground/80 shrink-0">
+            {formatPrice(locales[0][1].primaryAmount, locales[0][1].currency) ?? "—"}
+          </span>
+        )}
         <ChevronDown
           size={13}
           className={`text-muted-foreground/40 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
