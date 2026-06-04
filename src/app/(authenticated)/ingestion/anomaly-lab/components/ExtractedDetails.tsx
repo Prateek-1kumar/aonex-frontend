@@ -124,7 +124,7 @@ export function ExtractedDetails({ observations }: Props) {
               src={img.url}
               alt={img.alt_text ?? `Image ${i + 1}`}
               title={img.role ?? undefined}
-              className="size-16 rounded-lg object-cover border border-border/[0.08] shrink-0 bg-white/[0.03]"
+              className="size-16 rounded-lg object-cover border border-border/[0.08] shrink-0 bg-surface"
               loading="lazy"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -258,7 +258,7 @@ export function ExtractedDetails({ observations }: Props) {
             {copied ? "Copied" : "Copy"}
           </button>
         </summary>
-        <pre className="mt-2 text-[10px] leading-tight bg-black/30 rounded-lg p-3 overflow-x-auto max-h-72 text-foreground/60 border border-border/[0.06] whitespace-pre-wrap break-words">
+        <pre className="mt-2 text-[10px] leading-tight bg-code rounded-lg p-3 overflow-x-auto max-h-72 text-foreground/60 border border-border/[0.06] whitespace-pre-wrap break-words">
           {rawJson}
         </pre>
       </details>

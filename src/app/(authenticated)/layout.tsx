@@ -41,10 +41,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div
-        className="flex flex-1 flex-col"
-        style={{ marginLeft: "var(--sidebar-width)" }}
-      >
+      <div className="flex flex-1 flex-col ml-[var(--sidebar-width)]">
         <TopBar tabs={tabs} />
         <main className="flex-1 overflow-auto scrollbar-thin p-8">
           {children}

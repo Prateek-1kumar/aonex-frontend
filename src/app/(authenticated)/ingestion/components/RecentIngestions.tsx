@@ -23,10 +23,10 @@ interface Props {
 
 const STATUS_TONE: Record<RecentIngestion["status"], { dot: string; label: string }> = {
   pending:      { dot: "bg-muted-foreground/50",     label: "text-muted-foreground/70" },
-  processing:   { dot: "bg-amber-400",                label: "text-amber-300" },
-  completed:    { dot: "bg-emerald-400",              label: "text-emerald-300" },
-  failed:       { dot: "bg-red-400",                  label: "text-red-300" },
-  needs_review: { dot: "bg-amber-400",                label: "text-amber-300" }
+  processing:   { dot: "bg-warning",                label: "text-warning" },
+  completed:    { dot: "bg-success",              label: "text-success" },
+  failed:       { dot: "bg-danger",                  label: "text-danger" },
+  needs_review: { dot: "bg-warning",                label: "text-warning" }
 };
 
 const ESCALATION_ICON = {
@@ -37,8 +37,8 @@ const ESCALATION_ICON = {
 
 const ESCALATION_TONE = {
   static: "text-foreground/60",
-  browser: "text-amber-300",
-  unblock: "text-rose-300"
+  browser: "text-warning",
+  unblock: "text-danger"
 };
 
 function shortUrl(url: string): string {
@@ -135,7 +135,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
     <div className="rounded-xl border border-border/[0.07] bg-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-border/[0.06]">
         <div className="flex items-center gap-2">
-          <Sparkles size={12} className="text-primary/100" />
+          <Sparkles size={12} className="text-primary" />
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
             Recent Ingestions
           </p>
@@ -146,7 +146,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
         <button
           onClick={() => void load()}
           disabled={loading}
-          className="size-7 rounded-md bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center disabled:opacity-40"
+          className="size-7 rounded-md bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center disabled:opacity-40"
           aria-label="Refresh"
         >
           {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
@@ -154,7 +154,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
       </div>
 
       {error && (
-        <div className="px-5 py-3 text-xs text-red-300 bg-red-500/5 flex items-center gap-2">
+        <div className="px-5 py-3 text-xs text-danger bg-danger/5 flex items-center gap-2">
           <AlertCircle size={12} />
           {error}
         </div>
@@ -186,12 +186,12 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
             key={item.artifact_id}
             onClick={() => onRowClick(item.artifact_id)}
             className={[
-              "w-full text-left flex items-start gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors group",
+              "w-full text-left flex items-start gap-4 px-5 py-3 hover:bg-surface-hover transition-colors group",
               idx > 0 ? "border-t border-border/[0.04]" : ""
             ].join(" ")}
           >
             {/* Thumbnail */}
-            <div className="size-14 rounded-lg bg-white/[0.04] border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+            <div className="size-14 rounded-lg bg-surface border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
               {summary?.thumb ? (
                 <img
                   src={summary.thumb}
@@ -247,12 +247,12 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                   {item.fact_count} <span className="text-muted-foreground/45">facts</span>
                 </span>
                 {item.cost_credits > 0 && (
-                  <span className="normal-case tracking-normal tabular-nums text-rose-300/70">
+                  <span className="normal-case tracking-normal tabular-nums text-danger/70">
                     {item.cost_credits}c
                   </span>
                 )}
                 {isCsv && item.error_count ? (
-                  <span className="normal-case tracking-normal tabular-nums text-rose-300/70">
+                  <span className="normal-case tracking-normal tabular-nums text-danger/70">
                     {item.error_count} row issue{item.error_count === 1 ? "" : "s"}
                   </span>
                 ) : null}
@@ -284,7 +284,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                 </p>
               )}
               {summary?.rating && (
-                <p className="mt-0.5 text-[10px] tabular-nums text-amber-300/80">
+                <p className="mt-0.5 text-[10px] tabular-nums text-warning/80">
                   {summary.rating}
                 </p>
               )}

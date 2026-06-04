@@ -65,7 +65,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
     >
       <div
@@ -83,7 +83,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="size-9 rounded-lg bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] flex items-center justify-center shrink-0"
+            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center shrink-0"
             aria-label="Close"
           >
             <X size={15} />
@@ -91,7 +91,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-border/[0.06]">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.02] border border-border/[0.06]">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border/[0.06]">
             {(["sku", "events", "all"] as Tab[]).map((t) => (
               <button
                 key={t}
@@ -110,7 +110,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
           <button
             onClick={() => void handleCopy()}
             disabled={!trace}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-white/[0.04] border border-border/[0.08] text-foreground/70 hover:bg-white/[0.07] disabled:opacity-40"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover disabled:opacity-40"
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}
             {copied ? "Copied" : "Copy JSON"}
@@ -125,7 +125,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
           )}
 
           {error && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
               <AlertCircle size={14} />
               {error}
             </div>
@@ -134,10 +134,10 @@ export function TraceModal({ artifactId, onClose }: Props) {
           {trace && isCsv && tab === "sku" ? (
             <div className="space-y-6">
               {/* Row validation warning log */}
-              <div className="rounded-xl border border-amber-500/10 bg-amber-500/5 p-4">
+              <div className="rounded-xl border border-warning/10 bg-warning/5 p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle size={15} className="text-amber-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">Row Validation & Warning Log</h4>
+                  <AlertCircle size={15} className="text-warning" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-warning">Row Validation & Warning Log</h4>
                 </div>
                 {(trace.processing_errors ?? []).length === 0 ? (
                   <p className="text-xs text-muted-foreground">All rows passed validation checks without warnings.</p>
@@ -148,7 +148,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
                       return (
                         <div key={i} className="flex items-start gap-2 text-xs font-mono">
                           <span className="text-muted-foreground/60 shrink-0">Row {e.row}:</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold shrink-0 ${isWarning ? "bg-amber-400/10 text-amber-400" : "bg-red-400/10 text-red-400"}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold shrink-0 ${isWarning ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger"}`}>
                             {e.code}
                           </span>
                           <span className="text-foreground/80 break-words">{e.message}</span>
@@ -165,10 +165,10 @@ export function TraceModal({ artifactId, onClose }: Props) {
                 {!trace.children || trace.children.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No product groups found.</p>
                 ) : (
-                  <div className="overflow-hidden rounded-xl border border-border/[0.06] bg-black/10">
+                  <div className="overflow-hidden rounded-xl border border-border/[0.06] bg-surface">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-border/[0.06] bg-white/[0.02] text-muted-foreground/60 font-semibold">
+                        <tr className="border-b border-border/[0.06] bg-surface text-muted-foreground/60 font-semibold">
                           <th className="px-4 py-2.5">Primary Identifier</th>
                           <th className="px-4 py-2.5">Status</th>
                           <th className="px-4 py-2.5 text-right">Action</th>
@@ -187,26 +187,26 @@ export function TraceModal({ artifactId, onClose }: Props) {
                           let actionLabel = "";
 
                           if (child.status === "completed" && outcome === "admitted") {
-                            statusColor = "text-emerald-400 font-medium";
+                            statusColor = "text-success font-medium";
                             statusLabel = "Live (Catalog)";
                             if (productId) {
                               actionLink = `/catalog?id=${productId}`;
                               actionLabel = "View in Catalog";
                             }
                           } else if (child.status === "needs_review" && outcome === "staged") {
-                            statusColor = "text-amber-400 font-medium";
+                            statusColor = "text-warning font-medium";
                             statusLabel = "Needs Review";
                             if (stagedProductId) {
                               actionLink = `/ingestion/anomaly-lab?id=${stagedProductId}`;
                               actionLabel = "View in Anomaly Lab";
                             }
                           } else if (child.status === "failed") {
-                            statusColor = "text-red-400 font-medium";
+                            statusColor = "text-danger font-medium";
                             statusLabel = "Failed";
                           }
 
                           return (
-                            <tr key={child.id} className="hover:bg-white/[0.01]">
+                            <tr key={child.id} className="hover:bg-surface-hover">
                               <td className="px-4 py-2.5 font-mono text-foreground/90">{child.external_id}</td>
                               <td className="px-4 py-2.5">
                                 <span className={statusColor}>{statusLabel}</span>
@@ -236,7 +236,7 @@ export function TraceModal({ artifactId, onClose }: Props) {
             </div>
           ) : (
             trace && (
-              <pre className="text-[11px] leading-relaxed font-mono bg-black/30 rounded-lg p-4 border border-border/[0.06] text-foreground/85 whitespace-pre-wrap break-words">
+              <pre className="text-[11px] leading-relaxed font-mono bg-code rounded-lg p-4 border border-border/[0.06] text-foreground/85 whitespace-pre-wrap break-words">
                 {json}
               </pre>
             )
