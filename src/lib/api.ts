@@ -315,6 +315,23 @@ export interface EnrichCandidateDecision {
   decision: "accept" | "reject";
 }
 
+export interface ProposalListItem {
+  proposalId: string;
+  productId: string;
+  title: string | null;
+  status: EnrichmentProposalView["status"];
+  archetype: string | null;
+  scoreBefore: EnrichmentScore | null;
+  scoreAfter: EnrichmentScore | null;
+  fieldCount: number;
+  candidateCount: number;
+  updatedAt: string;
+}
+
+export interface EnrichBulkResult {
+  jobs: { productId: string; proposalId: string; jobId: string }[];
+}
+
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(^| )aonex_token=([^;]+)`));
@@ -599,6 +616,16 @@ export const api = {
         `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/reject`,
         { method: "POST" }
       );
+    },
+    bulk(productIds: string[]): Promise<EnrichBulkResult> {
+      return request<EnrichBulkResult>(`/api/catalog/enrichment/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ productIds }),
+      });
+    },
+    list(status?: string): Promise<{ proposals: ProposalListItem[] }> {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+      return request<{ proposals: ProposalListItem[] }>(`/api/catalog/enrichment/proposals${qs}`);
     },
   },
 

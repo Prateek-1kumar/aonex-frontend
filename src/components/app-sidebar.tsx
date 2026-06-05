@@ -23,11 +23,10 @@ const NAV = [
 type LockKey = "enrichment" | "analytics" | "optimisation" | "command-centre";
 type NavItem = (typeof NAV)[number];
 
-function getLockedSections(hasConnections: boolean): Set<LockKey> {
-  if (!hasConnections) {
-    return new Set(["enrichment", "analytics", "optimisation", "command-centre"]);
-  }
-  return new Set(["enrichment", "analytics", "optimisation", "command-centre"]);
+function getLockedSections(_hasConnections: boolean): Set<LockKey> {
+  // Enrichment is a live feature now (the /enrichment workspace). The rest stay
+  // locked until built.
+  return new Set(["analytics", "optimisation", "command-centre"]);
 }
 
 function getLockKey(item: NavItem): LockKey | undefined {
@@ -43,7 +42,7 @@ export default function AppSidebar() {
   const [profile, setProfile] = useState<Partial<UserProfile>>(getLocalProfile());
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [lockedSections, setLockedSections] = useState<Set<LockKey>>(
-    new Set(["enrichment", "analytics", "optimisation", "command-centre"])
+    new Set(["analytics", "optimisation", "command-centre"])
   );
   const [loggingOut, setLoggingOut] = useState(false);
 
