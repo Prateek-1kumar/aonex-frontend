@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X, Trash2, Copy, Check, Loader2, ChevronDown, AlertCircle, DollarSign,
-  Package, Braces, Play,
+  Package, Braces, Play, Wand2,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, pollEnrichmentProposal, type EnrichmentProposalView } from "@/lib/api";
 import { formatPrice, formatDate } from "@/lib/format";
 import { catalogStatusBadge } from "@/lib/status";
 import type { CatalogProductView, PricingLeaf } from "../lib/catalog-types";
+import { EnrichReviewDrawer } from "./EnrichReviewDrawer";
 
 interface Props {
   productId: string;
@@ -123,6 +124,9 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProposal, setEnrichProposal] = useState<EnrichmentProposalView | null>(null);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -160,9 +164,39 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
     try { await onDelete(productId); } finally { setDeleting(false); }
   }
 
+  async function reloadProduct() {
+    try {
+      const p = await api.catalog.get(productId, "strong");
+      setProduct(p);
+    } catch { /* keep the stale view rather than blanking it */ }
+  }
+
+  async function handleEnrich() {
+    setEnriching(true);
+    setEnrichError(null);
+    try {
+      const started = await api.enrich.start(productId);
+      const proposal = await pollEnrichmentProposal(productId, started.proposalId);
+      if (proposal.status === "ready") {
+        setEnrichProposal(proposal);
+      } else {
+        setEnrichError(
+          proposal.status === "failed"
+            ? proposal.reasoning ?? "Enrichment failed"
+            : `Enrichment ${proposal.status}`
+        );
+      }
+    } catch (e) {
+      setEnrichError((e as Error).message);
+    } finally {
+      setEnriching(false);
+    }
+  }
+
   if (!mounted) return null;
 
   return createPortal(
+    <>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
@@ -207,6 +241,12 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
             </div>
           )}
 
+          {enrichError && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+              <AlertCircle size={15} /> {enrichError}
+            </div>
+          )}
+
           {product && (
             <>
               <ProductHero product={product} onCopy={copy} copied={copied} />
@@ -246,6 +286,14 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
         {product && (
           <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 px-6 py-4 border-t border-border/[0.06] bg-card/95 backdrop-blur rounded-b-2xl">
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => void handleEnrich()}
+                disabled={enriching}
+                className="px-3.5 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25 disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {enriching ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                {enriching ? "Enriching…" : "Push to Enrich"}
+              </button>
               <button
                 onClick={() => copy("Product ID", product.product_id)}
                 className="px-3 py-1.5 rounded-md bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5"
