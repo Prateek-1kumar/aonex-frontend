@@ -18,8 +18,12 @@ const TABS: Record<string, { label: string; href: string }[]> = {
     { label: "Projections", href: "/catalog/projections" },
   ],
   "/enrichment": [
-    { label: "Enrichment", href: "/enrichment" },
-    { label: "Mappings",   href: "/enrichment/mappings" },
+    { label: "Drafting Room", href: "/enrichment" },
+    { label: "Review Commit", href: "/enrichment/review-commit" },
+  ],
+  "/enrichment/review-commit": [
+    { label: "Drafting Room", href: "/enrichment" },
+    { label: "Review Commit", href: "/enrichment/review-commit" },
   ],
   "/analytics": [
     { label: "Overview",  href: "/analytics" },
