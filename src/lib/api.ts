@@ -239,6 +239,82 @@ export interface ProductProvenance {
   fields: ProvenanceField[];
 }
 
+// ─── Catalog enrichment ("Push to Enrich") ────────────────────────
+
+export type EnrichGroup =
+  | "core" | "descriptive" | "occasion" | "care" | "marketing" | "seo" | "aeo" | "category";
+
+export interface ProposalFieldView {
+  attributeCode: string;
+  group: EnrichGroup;
+  before: unknown | null;
+  after: unknown;
+  confidence: number;
+  reasoning?: string;
+  action: "fill" | "improve" | "new";
+  valid: boolean;
+  validationError?: string;
+  decision: "pending" | "accept" | "reject" | "edit";
+  editedValue?: unknown;
+}
+
+export interface CandidateAttributeView {
+  key: string;
+  label: string;
+  group: EnrichGroup;
+  dataType: "string" | "number" | "boolean" | "array" | "object";
+  value: unknown;
+  unit?: string;
+  enumCandidates?: string[];
+  reasoning: string;
+  decision: "pending" | "accept" | "reject";
+}
+
+export interface EnrichmentScore {
+  completeness: number;
+}
+
+export interface EnrichmentProposalView {
+  proposalId: string;
+  productId: string;
+  status: "pending" | "generating" | "ready" | "applied" | "rejected" | "failed";
+  archetype: string | null;
+  model: string | null;
+  promptVersion: string;
+  fields: ProposalFieldView[];
+  candidates: CandidateAttributeView[];
+  scoreBefore: EnrichmentScore | null;
+  scoreAfter: EnrichmentScore | null;
+  reasoning: string | null;
+  costUsd: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnrichStartResult {
+  proposalId: string;
+  jobId: string;
+  status: string;
+}
+
+export interface EnrichApplyResult {
+  productId: string;
+  applied: string[];
+  registered: string[];
+  score: number;
+}
+
+export interface EnrichFieldDecision {
+  code: string;
+  decision: "accept" | "reject" | "edit";
+  editedValue?: unknown;
+}
+
+export interface EnrichCandidateDecision {
+  key: string;
+  decision: "accept" | "reject";
+}
+
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(^| )aonex_token=([^;]+)`));
@@ -493,6 +569,39 @@ export const api = {
     },
   },
 
+  enrich: {
+    start(productId: string): Promise<EnrichStartResult> {
+      return request<EnrichStartResult>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich`,
+        { method: "POST" }
+      );
+    },
+    get(productId: string, proposalId: string): Promise<EnrichmentProposalView> {
+      return request<EnrichmentProposalView>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}`
+      );
+    },
+    apply(
+      productId: string,
+      proposalId: string,
+      decisions: {
+        fieldDecisions: EnrichFieldDecision[];
+        candidateDecisions: EnrichCandidateDecision[];
+      }
+    ): Promise<EnrichApplyResult> {
+      return request<EnrichApplyResult>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/apply`,
+        { method: "POST", body: JSON.stringify(decisions) }
+      );
+    },
+    reject(productId: string, proposalId: string): Promise<{ ok: true }> {
+      return request<{ ok: true }>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/reject`,
+        { method: "POST" }
+      );
+    },
+  },
+
   lab: {
     queue(limit = 50, cursor?: string): Promise<{ items: QueueItem[]; nextCursor: string | null }> {
       const params = new URLSearchParams({ limit: String(limit) });
@@ -533,3 +642,39 @@ export const api = {
     );
   },
 };
+
+/**
+ * Poll an enrichment proposal until it reaches a terminal-ish state
+ * (ready/applied/rejected/failed) or times out. The job is slow (~10-30s).
+ */
+export async function pollEnrichmentProposal(
+  productId: string,
+  proposalId: string,
+  opts?: {
+    intervalMs?: number;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    onTick?: (p: EnrichmentProposalView) => void;
+  }
+): Promise<EnrichmentProposalView> {
+  const interval = opts?.intervalMs ?? 2500;
+  const timeout = opts?.timeoutMs ?? 180_000;
+  const started = Date.now();
+  for (;;) {
+    if (opts?.signal?.aborted) throw new Error("aborted");
+    const proposal = await api.enrich.get(productId, proposalId);
+    opts?.onTick?.(proposal);
+    if (
+      proposal.status === "ready" ||
+      proposal.status === "applied" ||
+      proposal.status === "rejected" ||
+      proposal.status === "failed"
+    ) {
+      return proposal;
+    }
+    if (Date.now() - started > timeout) {
+      throw new Error("Enrichment timed out");
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}
