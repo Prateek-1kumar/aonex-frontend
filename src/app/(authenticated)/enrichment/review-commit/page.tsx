@@ -269,6 +269,13 @@ function ReviewDetail({
                 <CheckCircle2 size={13} /> +{delta} point improvement
               </p>
             )}
+            {proposal.scoreAfter?.contentQuality != null && (
+              <p className="mt-3 text-[11px] text-muted-foreground/55">
+                Content quality{" "}
+                <span className="font-bold text-foreground/80 tabular-nums">{Math.round(proposal.scoreAfter.contentQuality)}</span>
+                <span className="text-muted-foreground/40">/100</span>
+              </p>
+            )}
           </div>
 
           <button

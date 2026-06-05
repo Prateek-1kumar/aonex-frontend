@@ -272,6 +272,8 @@ export interface CandidateAttributeView {
 
 export interface EnrichmentScore {
   completeness: number;
+  /** LLM content-quality score (0..100); present on scoreAfter once enriched. */
+  contentQuality?: number;
 }
 
 export interface EnrichmentProposalView {
@@ -619,6 +621,13 @@ export const api = {
     reject(productId: string, proposalId: string): Promise<{ ok: true }> {
       return request<{ ok: true }>(
         `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/reject`,
+        { method: "POST" }
+      );
+    },
+    /** Undo an applied enrichment (strip enrichment:llm observations, reconcile). */
+    revert(productId: string, proposalId: string): Promise<{ productId: string; score: number }> {
+      return request<{ productId: string; score: number }>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/revert`,
         { method: "POST" }
       );
     },
