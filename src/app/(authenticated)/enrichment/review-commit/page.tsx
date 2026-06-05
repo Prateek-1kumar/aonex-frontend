@@ -15,6 +15,7 @@ import {
   type EnrichFieldDecision,
 } from "@/lib/api";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
+import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
 import { loadCatalogTitles } from "@/lib/catalog-titles";
 
 type Toast = { type: "success" | "error"; message: string } | null;
@@ -250,23 +251,42 @@ function ReviewDetail({
             Accepted changes ({accepted.length + acceptedCandidates.length})
           </p>
           <div className="space-y-3">
-            {accepted.map((f) => (
-              <div key={f.attributeCode} className="rounded-xl border border-border/[0.08] bg-card p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">{GROUP_LABEL[f.group]} · {humanize(f.attributeCode)}</span>
-                  <span className="text-[10px] font-semibold text-success">{Math.round(f.confidence * 100)}%</span>
+            {accepted.map((f) => {
+              const after = afterValue(f);
+              const afterImgs = asImageUrls(after);
+              const beforeImgs = asImageUrls(f.before);
+              const hasBefore = f.before != null && f.before !== "";
+              return (
+                <div key={f.attributeCode} className="rounded-xl border border-border/[0.08] bg-card p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">{GROUP_LABEL[f.group]} · {humanize(f.attributeCode)}</span>
+                    <span className="text-[10px] font-semibold text-success">{Math.round(f.confidence * 100)}%</span>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    {afterImgs ? (
+                      <ThumbStrip urls={afterImgs} />
+                    ) : (
+                      <p className="flex items-start gap-2 text-sm text-primary/90 break-words whitespace-pre-wrap line-clamp-4">
+                        <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
+                        {renderVal(after)}
+                      </p>
+                    )}
+                    {hasBefore && (
+                      beforeImgs ? (
+                        <p className="text-[11px] text-muted-foreground/45">
+                          Replacing {beforeImgs.length} current image{beforeImgs.length === 1 ? "" : "s"}
+                        </p>
+                      ) : (
+                        <p className="flex items-baseline gap-1.5 text-[11px] text-muted-foreground/40">
+                          <span className="shrink-0 font-semibold uppercase tracking-wider">was</span>
+                          <span className="line-through line-clamp-2 break-words">{renderVal(f.before)}</span>
+                        </p>
+                      )
+                    )}
+                  </div>
                 </div>
-                <div className="mt-2 space-y-1.5">
-                  {f.before != null && f.before !== "" && (
-                    <p className="text-xs text-muted-foreground/45 line-through break-words">{renderVal(f.before)}</p>
-                  )}
-                  <p className="flex items-start gap-2 text-sm text-primary/90 italic break-words">
-                    <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
-                    {renderVal(afterValue(f))}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {acceptedCandidates.map((c) => (
               <div key={c.key} className="rounded-xl border border-primary/25 bg-primary/[0.04] p-4">
                 <div className="flex items-center justify-between gap-2">

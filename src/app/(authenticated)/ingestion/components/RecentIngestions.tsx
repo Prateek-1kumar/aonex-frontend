@@ -235,7 +235,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                 {(summary?.brand || summary?.category) && (
                   <span className="text-muted-foreground/40 shrink-0">·</span>
                 )}
-                <span className="font-mono truncate" title={isCsv ? (item.filename ?? "CSV upload") : item.final_url}>
+                <span className="font-mono truncate min-w-0" title={isCsv ? (item.filename ?? "CSV upload") : item.final_url}>
                   {isCsv ? (item.filename ?? "CSV upload") : shortUrl(item.final_url)}
                 </span>
               </div>

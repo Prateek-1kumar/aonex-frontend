@@ -13,6 +13,7 @@ import {
   type EnrichFieldDecision,
   type EnrichCandidateDecision,
 } from "@/lib/api";
+import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
 
 interface Props {
   productId: string;
@@ -57,40 +58,6 @@ function renderVal(v: unknown): string {
     return v.map((x) => (x && typeof x === "object" ? JSON.stringify(x) : String(x))).join(" · ");
   }
   return JSON.stringify(v);
-}
-
-/** Pull image URLs out of a value that's an array of url-strings or {url} objects. */
-function asImageUrls(v: unknown): string[] | null {
-  if (!Array.isArray(v)) return null;
-  const urls: string[] = [];
-  for (const x of v) {
-    if (typeof x === "string" && /^https?:\/\//i.test(x)) urls.push(x);
-    else if (x && typeof x === "object" && typeof (x as { url?: unknown }).url === "string") urls.push((x as { url: string }).url);
-  }
-  return urls.length ? urls : null;
-}
-
-function ThumbStrip({ urls }: { urls: string[] }) {
-  return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1">
-      {urls.slice(0, 12).map((u, i) => (
-        // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs
-        <img
-          key={`${u}-${i}`}
-          src={u}
-          alt=""
-          loading="lazy"
-          className="size-14 shrink-0 rounded-lg border border-border/[0.1] bg-surface object-cover"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        />
-      ))}
-      {urls.length > 12 && (
-        <span className="self-center px-1 text-[11px] font-semibold tabular-nums text-muted-foreground/50">
-          +{urls.length - 12}
-        </span>
-      )}
-    </div>
-  );
 }
 
 type FieldDecisionState = { decision: "accept" | "reject" | "edit"; editedValue?: string };
