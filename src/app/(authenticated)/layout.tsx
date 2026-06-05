@@ -50,9 +50,13 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const tabs = TABS[pathname] ?? [];
 
   return (
-    <div className="flex min-h-screen bg-background">
+    // Sidebar is position:fixed (out of flow); the content column only needs the
+    // left margin to clear it. Using flex-1 here would grow the column to the full
+    // viewport width AND then get pushed right by the margin, overflowing by the
+    // sidebar width — so it's a plain block whose auto width fills 100vw − sidebar.
+    <div className="min-h-screen bg-background">
       <AppSidebar />
-      <div className="flex flex-1 flex-col ml-[var(--sidebar-width)]">
+      <div className="flex min-h-screen flex-col ml-[var(--sidebar-width)]">
         <TopBar tabs={tabs} />
         <main className="flex-1 overflow-auto scrollbar-thin p-8">
           {children}
