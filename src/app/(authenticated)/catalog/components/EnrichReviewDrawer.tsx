@@ -10,13 +10,22 @@ import {
   type EnrichmentProposalView,
   type ProposalFieldView,
   type EnrichGroup,
+  type EnrichFieldDecision,
+  type EnrichCandidateDecision,
 } from "@/lib/api";
 
 interface Props {
   productId: string;
   proposal: EnrichmentProposalView;
   onClose: () => void;
-  onApplied: (score: number) => void;
+  /** Label for the primary action button (e.g. "Commit" / "Send to Review Commit"). */
+  commitLabel?: string;
+  /** Called with the user's decisions when the primary action is clicked. The
+   *  parent decides whether that means apply (Sync) or review (send onward). */
+  onCommit: (decisions: {
+    fieldDecisions: EnrichFieldDecision[];
+    candidateDecisions: EnrichCandidateDecision[];
+  }) => Promise<void>;
 }
 
 const GROUP_LABEL: Record<EnrichGroup, string> = {
@@ -52,7 +61,7 @@ function renderVal(v: unknown): string {
 
 type FieldDecisionState = { decision: "accept" | "reject" | "edit"; editedValue?: string };
 
-export function EnrichReviewDrawer({ productId, proposal, onClose, onApplied }: Props) {
+export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, commitLabel }: Props) {
   const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState<"commit" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
