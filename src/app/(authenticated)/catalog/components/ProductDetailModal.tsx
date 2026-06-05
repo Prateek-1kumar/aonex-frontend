@@ -351,9 +351,10 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
       <EnrichReviewDrawer
         productId={productId}
         proposal={enrichProposal}
+        commitLabel="Commit to catalog"
         onClose={() => setEnrichProposal(null)}
-        onApplied={() => {
-          setEnrichProposal(null);
+        onCommit={async (decisions) => {
+          await api.enrich.apply(productId, enrichProposal.proposalId, decisions);
           void reloadProduct();
         }}
       />
