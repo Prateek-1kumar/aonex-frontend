@@ -326,10 +326,15 @@ export interface ProposalListItem {
   fieldCount: number;
   candidateCount: number;
   updatedAt: string;
+  reviewedAt: string | null;
 }
 
 export interface EnrichBulkResult {
   jobs: { productId: string; proposalId: string; jobId: string }[];
+}
+
+export interface EnrichPushResult {
+  drafts: { proposalId: string; productId: string }[];
 }
 
 function getToken(): string | null {
@@ -623,8 +628,39 @@ export const api = {
         body: JSON.stringify({ productIds }),
       });
     },
-    list(status?: string): Promise<{ proposals: ProposalListItem[] }> {
-      const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    /** Stage products into the Drafting Room (no job started yet). */
+    push(productIds: string[]): Promise<EnrichPushResult> {
+      return request<EnrichPushResult>(`/api/catalog/enrichment/push`, {
+        method: "POST",
+        body: JSON.stringify({ productIds }),
+      });
+    },
+    /** Kick off the LLM job for a staged draft. */
+    run(proposalId: string): Promise<{ proposalId: string; status: string }> {
+      return request<{ proposalId: string; status: string }>(
+        `/api/catalog/enrichment/${encodeURIComponent(proposalId)}/run`,
+        { method: "POST" }
+      );
+    },
+    /** Save per-field decisions and send the draft to Review Commit. */
+    review(
+      productId: string,
+      proposalId: string,
+      decisions: {
+        fieldDecisions: EnrichFieldDecision[];
+        candidateDecisions: EnrichCandidateDecision[];
+      }
+    ): Promise<{ ok: true }> {
+      return request<{ ok: true }>(
+        `/api/catalog/products/${encodeURIComponent(productId)}/enrich/${encodeURIComponent(proposalId)}/review`,
+        { method: "POST", body: JSON.stringify(decisions) }
+      );
+    },
+    list(opts?: { status?: string; reviewed?: boolean }): Promise<{ proposals: ProposalListItem[] }> {
+      const params = new URLSearchParams();
+      if (opts?.status) params.set("status", opts.status);
+      if (opts?.reviewed !== undefined) params.set("reviewed", String(opts.reviewed));
+      const qs = params.toString() ? `?${params.toString()}` : "";
       return request<{ proposals: ProposalListItem[] }>(`/api/catalog/enrichment/proposals${qs}`);
     },
   },
