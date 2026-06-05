@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertCircle,
   Loader2,
@@ -21,13 +21,26 @@ interface Props {
   refreshSignal: number;
 }
 
-const STATUS_TONE: Record<RecentIngestion["status"], { dot: string; label: string }> = {
-  pending:      { dot: "bg-muted-foreground/50",     label: "text-muted-foreground/70" },
-  processing:   { dot: "bg-warning",                label: "text-warning" },
-  completed:    { dot: "bg-success",              label: "text-success" },
-  failed:       { dot: "bg-danger",                  label: "text-danger" },
-  needs_review: { dot: "bg-warning",                label: "text-warning" }
+const STATUS_PILL: Record<RecentIngestion["status"], { label: string; cls: string }> = {
+  pending:      { label: "Pending",      cls: "border-border/[0.12] bg-surface text-muted-foreground/70" },
+  processing:   { label: "Processing",   cls: "border-warning/25 bg-warning/12 text-warning" },
+  completed:    { label: "Completed",    cls: "border-success/25 bg-success/12 text-success" },
+  failed:       { label: "Failed",       cls: "border-danger/25 bg-danger/12 text-danger" },
+  needs_review: { label: "Needs Review", cls: "border-warning/25 bg-warning/12 text-warning" },
 };
+
+function MetaChip({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "danger" }) {
+  return (
+    <span className={[
+      "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+      tone === "danger"
+        ? "border-danger/20 bg-danger/10 text-danger/80"
+        : "border-border/[0.08] bg-surface text-muted-foreground/65",
+    ].join(" ")}>
+      {children}
+    </span>
+  );
+}
 
 const ESCALATION_ICON = {
   static: <Globe size={11} />,
@@ -172,7 +185,7 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
       )}
 
       {items.map((item, idx) => {
-        const tone = STATUS_TONE[item.status] ?? STATUS_TONE.pending;
+        const pill = STATUS_PILL[item.status] ?? STATUS_PILL.pending;
         const skuState = skus[item.artifact_id];
         const isLoadingSku =
           (item.status === "completed" || item.status === "needs_review") &&
@@ -188,90 +201,76 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
             key={item.artifact_id}
             onClick={() => onRowClick(item.artifact_id)}
             className={[
-              "w-full text-left flex items-start gap-4 px-5 py-3 hover:bg-surface-hover transition-colors group",
+              "w-full text-left flex items-center gap-4 px-5 py-4 hover:bg-surface-hover transition-colors group",
               idx > 0 ? "border-t border-border/[0.04]" : ""
             ].join(" ")}
           >
             {/* Thumbnail */}
-            <div className="size-14 rounded-lg bg-surface border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+            <div className="size-16 rounded-xl bg-surface border border-border/[0.08] overflow-hidden grid place-items-center shrink-0 shadow-sm">
               {summary?.thumb ? (
                 <img
                   src={summary.thumb}
                   alt={summary.title ?? ""}
                   className="h-full w-full object-cover"
+                  loading="lazy"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
               ) : (
-                <ImageOff size={16} className="text-muted-foreground/40" strokeWidth={1.2} />
+                <ImageOff size={18} className="text-muted-foreground/35" strokeWidth={1.2} />
               )}
             </div>
 
             {/* Main content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className={`size-1.5 rounded-full ${tone.dot}`} />
-                <p className="text-sm font-semibold text-foreground/95 truncate">
-                  {primaryLabel}
-                </p>
-              </div>
+              <p className="text-sm font-semibold text-foreground/95 truncate group-hover:text-primary transition-colors">
+                {primaryLabel}
+              </p>
 
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/65 flex-wrap">
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground/60 min-w-0">
                 {summary?.brand && (
-                  <span className="text-foreground/75 font-medium">{summary.brand}</span>
+                  <span className="text-foreground/75 font-medium shrink-0">{summary.brand}</span>
                 )}
-                {summary?.brand && summary?.category && <span>·</span>}
-                {summary?.category && <span className="truncate max-w-[260px]">{summary.category}</span>}
+                {summary?.brand && summary?.category && <span className="shrink-0">·</span>}
+                {summary?.category && <span className="truncate max-w-[240px]">{summary.category}</span>}
                 {(summary?.brand || summary?.category) && (
-                  <span className="text-muted-foreground/40">·</span>
+                  <span className="text-muted-foreground/40 shrink-0">·</span>
                 )}
                 <span className="font-mono truncate" title={isCsv ? (item.filename ?? "CSV upload") : item.final_url}>
                   {isCsv ? (item.filename ?? "CSV upload") : shortUrl(item.final_url)}
                 </span>
               </div>
 
-              <div className="mt-1.5 flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground/55">
-                <span className={`font-semibold ${tone.label}`}>
-                  {item.status.replace("_", " ")}
+              {/* Chip row */}
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${pill.cls}`}>
+                  {pill.label}
                 </span>
-                <span className="normal-case tracking-normal text-muted-foreground/45">
-                  {formatRelativeTime(item.received_at)}
-                </span>
+                <MetaChip>{formatRelativeTime(item.received_at)}</MetaChip>
+                <MetaChip>{item.fact_count} facts</MetaChip>
                 {item.escalated_to && (
                   <span
-                    className={`flex items-center gap-1 font-semibold ${ESCALATION_TONE[item.escalated_to]}`}
+                    className={`inline-flex items-center gap-1 rounded-md border border-border/[0.08] bg-surface px-1.5 py-0.5 text-[10px] font-semibold capitalize ${ESCALATION_TONE[item.escalated_to]}`}
                     title={item.escalation_reasons.length > 0 ? `Reasons: ${item.escalation_reasons.join(", ")}` : item.escalated_to}
                   >
                     {ESCALATION_ICON[item.escalated_to]}
                     {item.escalated_to}
                   </span>
                 )}
-                <span className="normal-case tracking-normal tabular-nums text-foreground/70">
-                  {item.fact_count} <span className="text-muted-foreground/45">facts</span>
-                </span>
-                {item.cost_credits > 0 && (
-                  <span className="normal-case tracking-normal tabular-nums text-danger/70">
-                    {item.cost_credits}c
-                  </span>
-                )}
+                {item.cost_credits > 0 && <MetaChip tone="danger">{item.cost_credits}c</MetaChip>}
                 {isCsv && item.error_count ? (
-                  <span className="normal-case tracking-normal tabular-nums text-danger/70">
-                    {item.error_count} row issue{item.error_count === 1 ? "" : "s"}
-                  </span>
+                  <MetaChip tone="danger">{item.error_count} row issue{item.error_count === 1 ? "" : "s"}</MetaChip>
                 ) : null}
                 {isLoadingSku && (
-                  <span className="flex items-center gap-1 normal-case tracking-normal text-muted-foreground/45">
-                    <Loader2 size={10} className="animate-spin" />
-                    loading SKU
-                  </span>
+                  <MetaChip><Loader2 size={9} className="animate-spin" /> SKU</MetaChip>
                 )}
               </div>
             </div>
 
             {/* Price + rating column */}
-            <div className="text-right shrink-0 min-w-[88px]">
+            <div className="text-right shrink-0 min-w-[92px]">
               {summary?.price ? (
                 <div className="flex items-baseline gap-1.5 justify-end">
-                  <p className="text-sm font-bold tabular-nums text-foreground/90">
+                  <p className="text-base font-bold tabular-nums text-foreground/90">
                     {summary.price}
                   </p>
                   {summary.strike && (
@@ -286,15 +285,15 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
                 </p>
               )}
               {summary?.rating && (
-                <p className="mt-0.5 text-[10px] tabular-nums text-warning/80">
+                <p className="mt-1 inline-flex items-center justify-end rounded-md border border-warning/20 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-warning">
                   {summary.rating}
                 </p>
               )}
             </div>
 
             <ExternalLink
-              size={12}
-              className="mt-1 text-muted-foreground/30 group-hover:text-foreground/60 transition-colors shrink-0"
+              size={13}
+              className="text-muted-foreground/25 group-hover:text-primary transition-colors shrink-0"
             />
           </button>
         );

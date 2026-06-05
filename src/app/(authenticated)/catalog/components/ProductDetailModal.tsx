@@ -179,6 +179,20 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
     }
   }
 
+  const headerSummary = useMemo(() => {
+    if (!product) return null;
+    const wv = product.winning_values;
+    const identity = (product.identity ?? {}) as Record<string, unknown>;
+    const titleRaw = extractWinningValue(wv, "title") ?? identity.title ?? null;
+    const brandRaw = extractWinningValue(wv, "brand") ?? identity.brand ?? null;
+    const imgs = extractImages(wv);
+    return {
+      title: typeof titleRaw === "string" && titleRaw.trim() ? titleRaw : null,
+      brand: typeof brandRaw === "string" && brandRaw.trim() ? brandRaw : null,
+      thumb: imgs[0]?.url ?? null,
+    };
+  }, [product]);
+
   if (!mounted) return null;
 
   return createPortal(
@@ -191,21 +205,40 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl overflow-hidden">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-5 py-3.5 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl overflow-hidden">
           <div className="pointer-events-none absolute -left-10 -top-16 size-52 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.3),transparent_70%)] opacity-50 blur-2xl" />
-          <div className="relative flex items-center gap-3 min-w-0">
-            {product && (
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${catalogStatusBadge(product.status).className}`}>
-                {catalogStatusBadge(product.status).label}
-              </span>
-            )}
-            <span className="text-[11px] font-mono text-muted-foreground/55 truncate">
-              {productId.slice(0, 8)}
-            </span>
+          <div className="relative flex items-center gap-3.5 min-w-0">
+            <div className="grid size-11 place-items-center overflow-hidden rounded-xl border border-border/[0.1] bg-surface shrink-0">
+              {headerSummary?.thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs
+                <img src={headerSummary.thumb} alt="" className="size-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              ) : (
+                <Package size={18} className="text-muted-foreground/40" strokeWidth={1.4} />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                {product && (
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${catalogStatusBadge(product.status).className}`}>
+                    {catalogStatusBadge(product.status).label}
+                  </span>
+                )}
+                <span className="text-[10px] font-mono text-muted-foreground/45 truncate">
+                  {productId.slice(0, 8)}
+                </span>
+              </div>
+              <h2 className="mt-0.5 font-serif text-base font-bold leading-tight text-foreground/95 truncate">
+                {headerSummary?.title ?? (loading ? "Loading product…" : "Product")}
+              </h2>
+              {headerSummary?.brand && (
+                <p className="text-[11px] text-muted-foreground/60 truncate">{headerSummary.brand}</p>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center shrink-0"
+            className="relative size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center shrink-0 transition-colors"
             aria-label="Close"
           >
             <X size={15} />
@@ -369,8 +402,10 @@ function ProductHero({
   const descStr = renderValue(description);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
-      <ImageGallery images={images} />
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+      <div className="lg:sticky lg:top-2 self-start">
+        <ImageGallery images={images} />
+      </div>
 
       <div className="min-w-0">
         {(brandStr !== "—" || categoryStr !== "—") && (
