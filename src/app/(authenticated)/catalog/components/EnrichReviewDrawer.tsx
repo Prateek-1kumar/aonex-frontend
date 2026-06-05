@@ -128,11 +128,8 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
       const candidateDecisions = proposal.candidates
         .map((c) => ({ key: c.key, decision: candDecs[c.key] ?? ("reject" as const) }))
         .filter((d) => d.decision === "accept");
-      const result = await api.enrich.apply(productId, proposal.proposalId, {
-        fieldDecisions,
-        candidateDecisions,
-      });
-      onApplied(result.score);
+      await onCommit({ fieldDecisions, candidateDecisions });
+      onClose();
     } catch (e) {
       setError((e as Error).message);
       setBusy(null);
@@ -289,7 +286,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
               className="px-4 py-1.5 rounded-lg bg-success/15 border border-success/30 text-success text-xs font-semibold hover:bg-success/25 disabled:opacity-40 flex items-center gap-1.5"
             >
               {busy === "commit" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-              Commit {acceptedCount > 0 ? acceptedCount : ""}
+              {commitLabel ?? "Commit"} {acceptedCount > 0 ? acceptedCount : ""}
             </button>
           </div>
         </div>
