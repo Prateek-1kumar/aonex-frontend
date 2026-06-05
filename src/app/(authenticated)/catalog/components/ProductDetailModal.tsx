@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   X, Trash2, Copy, Check, Loader2, ChevronDown, AlertCircle, DollarSign,
   Package, Braces, Play, Wand2,
 } from "lucide-react";
-import { api, pollEnrichmentProposal, type EnrichmentProposalView } from "@/lib/api";
+import { api } from "@/lib/api";
 import { formatPrice, formatDate } from "@/lib/format";
 import { catalogStatusBadge } from "@/lib/status";
 import type { CatalogProductView, PricingLeaf } from "../lib/catalog-types";
-import { EnrichReviewDrawer } from "./EnrichReviewDrawer";
 
 interface Props {
   productId: string;
@@ -116,6 +116,7 @@ const SPEC_SKIP = new Set([
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
+  const router = useRouter();
   const [product, setProduct] = useState<CatalogProductView | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -124,9 +125,8 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showJson, setShowJson] = useState(false);
-  const [enriching, setEnriching] = useState(false);
-  const [enrichProposal, setEnrichProposal] = useState<EnrichmentProposalView | null>(null);
-  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -164,39 +164,24 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
     try { await onDelete(productId); } finally { setDeleting(false); }
   }
 
-  async function reloadProduct() {
+  // Stage this product into the Drafting Room, then take the user there to
+  // run/review the enrichment. (The actual LLM pass runs per-draft in /enrichment.)
+  async function handlePushToEnrich() {
+    setPushing(true);
+    setPushError(null);
     try {
-      const p = await api.catalog.get(productId, "strong");
-      setProduct(p);
-    } catch { /* keep the stale view rather than blanking it */ }
-  }
-
-  async function handleEnrich() {
-    setEnriching(true);
-    setEnrichError(null);
-    try {
-      const started = await api.enrich.start(productId);
-      const proposal = await pollEnrichmentProposal(productId, started.proposalId);
-      if (proposal.status === "ready") {
-        setEnrichProposal(proposal);
-      } else {
-        setEnrichError(
-          proposal.status === "failed"
-            ? proposal.reasoning ?? "Enrichment failed"
-            : `Enrichment ${proposal.status}`
-        );
-      }
+      await api.enrich.push([productId]);
+      onClose();
+      router.push("/enrichment");
     } catch (e) {
-      setEnrichError((e as Error).message);
-    } finally {
-      setEnriching(false);
+      setPushError((e as Error).message);
+      setPushing(false);
     }
   }
 
   if (!mounted) return null;
 
   return createPortal(
-    <>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
       onClick={onClose}
@@ -241,9 +226,9 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
             </div>
           )}
 
-          {enrichError && (
+          {pushError && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-              <AlertCircle size={15} /> {enrichError}
+              <AlertCircle size={15} /> {pushError}
             </div>
           )}
 
@@ -287,12 +272,12 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
           <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 px-6 py-4 border-t border-border/[0.06] bg-card/95 backdrop-blur rounded-b-2xl">
             <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => void handleEnrich()}
-                disabled={enriching}
+                onClick={() => void handlePushToEnrich()}
+                disabled={pushing}
                 className="px-3.5 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25 disabled:opacity-40 flex items-center gap-1.5"
               >
-                {enriching ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-                {enriching ? "Enriching…" : "Push to Enrich"}
+                {pushing ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                {pushing ? "Pushing…" : "Push to Enrich"}
               </button>
               <button
                 onClick={() => copy("Product ID", product.product_id)}
@@ -345,21 +330,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
           </div>
         )}
       </div>
-    </div>
-
-    {enrichProposal && (
-      <EnrichReviewDrawer
-        productId={productId}
-        proposal={enrichProposal}
-        commitLabel="Commit to catalog"
-        onClose={() => setEnrichProposal(null)}
-        onCommit={async (decisions) => {
-          await api.enrich.apply(productId, enrichProposal.proposalId, decisions);
-          void reloadProduct();
-        }}
-      />
-    )}
-    </>,
+    </div>,
     document.body
   );
 }
