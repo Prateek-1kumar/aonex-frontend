@@ -64,12 +64,27 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       animation: {
-        ticker: "ticker 35s linear infinite",
+        ticker:      "ticker 35s linear infinite",
+        "fade-in":   "fadeIn .2s ease-out both",
+        "modal-in":  "modalIn .26s cubic-bezier(.16,1,.3,1) both",
+        "soft-pulse":"softPulse 1.8s ease-in-out infinite",
       },
       keyframes: {
         ticker: {
           "0%":   { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
+        },
+        fadeIn: {
+          from: { opacity: "0" },
+          to:   { opacity: "1" },
+        },
+        modalIn: {
+          from: { opacity: "0", transform: "translateY(10px) scale(.985)" },
+          to:   { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        softPulse: {
+          "0%,100%": { opacity: "1" },
+          "50%":     { opacity: ".45" },
         },
       },
     },

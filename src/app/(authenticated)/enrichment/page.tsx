@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  Wand2, Loader2, RefreshCw, CheckCircle2, AlertCircle, ArrowRight, Search, Plus, X, Sparkles, Package,
+  Wand2, Loader2, RefreshCw, CheckCircle2, AlertCircle, ArrowRight, Search, Plus, X, Sparkles, Layers,
 } from "lucide-react";
 import {
   api,
@@ -14,6 +14,8 @@ import {
 } from "@/lib/api";
 import type { ListCatalogProductRow } from "@/app/(authenticated)/catalog/lib/catalog-types";
 import { EnrichReviewDrawer } from "@/app/(authenticated)/catalog/components/EnrichReviewDrawer";
+import { PageHero, StatCard } from "@/components/ui/page-chrome";
+import { loadCatalogTitles } from "@/lib/catalog-titles";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 const STAGED = new Set(["pending", "generating", "ready"]);
@@ -41,6 +43,9 @@ export default function DraftingRoomPage() {
   const [enriching, setEnriching] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<EnrichmentProposalView | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  // Resolves "Untitled" rows: freshly-pushed proposals carry title:null, so we
+  // fall back to the real product title from the catalog.
+  const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((t: Toast) => {
@@ -61,6 +66,12 @@ export default function DraftingRoomPage() {
   }, [showToast]);
 
   useEffect(() => { void loadDrafts(); }, [loadDrafts]);
+  useEffect(() => { void loadCatalogTitles().then(setTitles).catch(() => {}); }, []);
+
+  const titleOf = useCallback(
+    (d: ProposalListItem) => d.title ?? titles.get(d.productId) ?? null,
+    [titles]
+  );
 
   const inFlight = useMemo(
     () => drafts.filter((d) => d.status === "pending" || d.status === "generating").length,
@@ -116,44 +127,48 @@ export default function DraftingRoomPage() {
   }
 
   return (
-    <div className="animate-in mx-auto max-w-6xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-bold text-foreground/95">Drafting Room</h1>
-          <p className="mt-1 text-sm text-muted-foreground/65">
-            Push products here, then enrich each one to generate a richer schema. Reviewed drafts move to Review Commit.
-          </p>
+    <div className="animate-in w-full">
+      <PageHero
+        icon={<Wand2 size={22} strokeWidth={1.6} />}
+        eyebrow="Enrichment"
+        title="Drafting Room"
+        description="Push products here, then enrich each one to generate a richer schema. Reviewed drafts move to Review Commit."
+        actions={
+          <>
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-gradient-to-b from-primary to-primary/85 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/25 hover:brightness-110 active:translate-y-px transition-all flex items-center gap-1.5"
+            >
+              <Plus size={14} /> Push products
+            </button>
+            <button
+              onClick={() => void loadDrafts()}
+              className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw size={13} /> Refresh
+            </button>
+          </>
+        }
+      >
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard icon={<Layers size={16} />} label="Staged" value={drafts.length} tone="primary" />
+          <StatCard icon={<Loader2 size={16} className={inFlight ? "animate-spin" : ""} />} label="In Flight" value={inFlight} tone="warning" />
+          <StatCard icon={<Sparkles size={16} />} label="Ready" value={readyCount} tone="success" />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25 flex items-center gap-1.5"
-          >
-            <Plus size={14} /> Push products
-          </button>
-          <button
-            onClick={() => void loadDrafts()}
-            className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5"
-          >
-            <RefreshCw size={13} /> Refresh
-          </button>
-        </div>
-      </div>
+      </PageHero>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <StatChip label="staged" value={drafts.length} icon={<Package size={13} />} />
-        <StatChip label="in flight" value={inFlight} icon={<Loader2 size={13} className={inFlight ? "animate-spin" : ""} />} />
+      <div className="mb-4 flex justify-end">
         <Link
           href="/enrichment/review-commit"
-          className="group inline-flex items-center gap-2 rounded-lg border border-success/25 bg-success/[0.06] px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/15"
+          className="group inline-flex items-center gap-2 rounded-lg border border-success/25 bg-success/[0.06] px-3.5 py-2 text-xs font-semibold text-success hover:bg-success/15 transition-colors"
         >
-          <CheckCircle2 size={13} /> Review Commit
-          <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+          <CheckCircle2 size={14} /> Continue to Review Commit
+          <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
 
-      <div className="mt-6 rounded-xl border border-border/[0.08] bg-card overflow-hidden">
-        <div className="grid grid-cols-[1fr_130px_150px] gap-3 px-4 py-2.5 border-b border-border/[0.06] text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+      <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
+        <div className="grid grid-cols-[1fr_130px_150px] gap-3 px-4 py-3 border-b border-border/[0.06] bg-gradient-to-b from-surface/40 to-transparent text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
           <span>Product</span>
           <span>Status</span>
           <span className="text-right">Action</span>
@@ -165,6 +180,12 @@ export default function DraftingRoomPage() {
           </div>
         ) : drafts.length === 0 ? (
           <div className="py-16 text-center">
+            <div className="relative mx-auto mb-5 w-fit">
+              <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--primary)/0.4),transparent_70%)] opacity-50 blur-lg" />
+              <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/45">
+                <Wand2 size={24} strokeWidth={1.5} />
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground/60">Your Drafting Room is empty.</p>
             <button onClick={() => setPickerOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
               <Plus size={13} /> Push products to enrich
@@ -175,8 +196,8 @@ export default function DraftingRoomPage() {
             {drafts.map((d) => (
               <div key={d.proposalId} className="grid grid-cols-[1fr_130px_150px] gap-3 px-4 py-3.5 items-center hover:bg-surface-hover transition-colors">
                 <div className="min-w-0">
-                  <p className="text-sm text-foreground/90 truncate">
-                    {d.title ?? <span className="italic text-muted-foreground/50">Untitled product</span>}
+                  <p className="text-sm font-medium text-foreground/90 truncate">
+                    {titleOf(d) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}
                   </p>
                   <p className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
                     {d.archetype && <span className="uppercase tracking-wider">{d.archetype}</span>}
@@ -252,16 +273,6 @@ export default function DraftingRoomPage() {
   );
 }
 
-function StatChip({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-lg border border-border/[0.08] bg-surface px-3 py-1.5 text-xs text-foreground/70">
-      <span className="text-muted-foreground/50">{icon}</span>
-      <span className="font-bold tabular-nums">{value}</span>
-      <span className="text-muted-foreground/55">{label}</span>
-    </span>
-  );
-}
-
 function DraftBadge({ status }: { status: ProposalListItem["status"] }) {
   const map: Record<ProposalListItem["status"], { label: string; cls: string; spin?: boolean }> = {
     pending: { label: "Staged", cls: "bg-surface text-muted-foreground/60 border-border/[0.1]" },
@@ -320,11 +331,12 @@ function PushPicker({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
-      <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl">
-          <h2 className="font-serif text-lg font-bold text-foreground/95">Push products to enrich</h2>
-          <button onClick={onClose} className="size-8 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center"><X size={14} /></button>
+    <div className="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl animate-modal-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl overflow-hidden">
+          <div className="pointer-events-none absolute -left-8 -top-12 size-44 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.3),transparent_70%)] opacity-50 blur-2xl" />
+          <h2 className="relative font-serif text-lg font-bold text-foreground/95">Push products to enrich</h2>
+          <button onClick={onClose} className="relative size-8 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center transition-colors"><X size={14} /></button>
         </div>
         <div className="px-5 py-3 border-b border-border/[0.06]">
           <label className="flex items-center gap-2 rounded-lg border border-border/[0.08] bg-surface px-3 py-1.5">
@@ -360,7 +372,7 @@ function PushPicker({
           <button
             onClick={async () => { setBusy(true); try { await onPush([...selected]); } finally { setBusy(false); } }}
             disabled={selected.size === 0 || busy}
-            className="px-4 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25 disabled:opacity-40 flex items-center gap-1.5"
+            className="px-4 py-1.5 rounded-lg bg-gradient-to-b from-primary to-primary/85 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/25 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40 disabled:shadow-none flex items-center gap-1.5"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
             Push {selected.size > 0 ? selected.size : ""}

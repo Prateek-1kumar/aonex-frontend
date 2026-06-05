@@ -10,12 +10,14 @@ import {
   Package,
   SlidersHorizontal,
   Download,
+  Boxes,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { getDisplayPrice } from "./lib/price";
 import { catalogStatusBadge } from "@/lib/status";
+import { PageHero } from "@/components/ui/page-chrome";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
@@ -223,14 +225,12 @@ function CatalogPageContent() {
   return (
     <div className="animate-in max-w-8xl pb-16">
       {/* Header */}
-      <div className="mb-7 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-4xl font-bold text-foreground leading-none">Master Catalog</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Every approved product — health, status, and pricing at a glance.
-          </p>
-        </div>
-      </div>
+      <PageHero
+        icon={<Boxes size={22} strokeWidth={1.6} />}
+        eyebrow="Master Catalog"
+        title="Master Catalog"
+        description="Every approved product — health, status, and pricing at a glance."
+      />
 
       {/* Tab bar + actions */}
       <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
@@ -304,9 +304,9 @@ function CatalogPageContent() {
       )}
 
       {/* Table */}
-      <div className="rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+      <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
         {/* Header row */}
-        <div className="grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3 border-b border-border/[0.08] bg-surface">
+        <div className="grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3 border-b border-border/[0.08] bg-gradient-to-b from-surface to-surface/40">
           <div className="flex items-center">
             <Checkbox checked={allChecked} onChange={toggleAll} />
           </div>
@@ -324,7 +324,13 @@ function CatalogPageContent() {
             <span className="text-sm">Loading catalog…</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center">
+          <div className="p-14 text-center">
+            <div className="relative mx-auto mb-5 w-fit">
+              <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--primary)/0.4),transparent_70%)] opacity-50 blur-lg" />
+              <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/50">
+                <Package size={26} strokeWidth={1.5} />
+              </div>
+            </div>
             <p className="font-serif text-lg font-semibold text-foreground/80">
               {products.length === 0 ? "No canonical products yet" : "Nothing matches this view"}
             </p>

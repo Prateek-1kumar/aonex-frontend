@@ -59,6 +59,40 @@ function renderVal(v: unknown): string {
   return JSON.stringify(v);
 }
 
+/** Pull image URLs out of a value that's an array of url-strings or {url} objects. */
+function asImageUrls(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const urls: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string" && /^https?:\/\//i.test(x)) urls.push(x);
+    else if (x && typeof x === "object" && typeof (x as { url?: unknown }).url === "string") urls.push((x as { url: string }).url);
+  }
+  return urls.length ? urls : null;
+}
+
+function ThumbStrip({ urls }: { urls: string[] }) {
+  return (
+    <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1">
+      {urls.slice(0, 12).map((u, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs
+        <img
+          key={`${u}-${i}`}
+          src={u}
+          alt=""
+          loading="lazy"
+          className="size-14 shrink-0 rounded-lg border border-border/[0.1] bg-surface object-cover"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        />
+      ))}
+      {urls.length > 12 && (
+        <span className="self-center px-1 text-[11px] font-semibold tabular-nums text-muted-foreground/50">
+          +{urls.length - 12}
+        </span>
+      )}
+    </div>
+  );
+}
+
 type FieldDecisionState = { decision: "accept" | "reject" | "edit"; editedValue?: string };
 
 export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, commitLabel }: Props) {
@@ -152,18 +186,22 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-md animate-fade-in"
       onClick={() => { if (!busy) onClose(); }}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
+        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl animate-modal-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header — score delta */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="size-9 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
-              <Wand2 size={16} className="text-primary" />
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl overflow-hidden">
+          <div className="pointer-events-none absolute -left-10 -top-16 size-52 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.32),transparent_70%)] opacity-60 blur-2xl" />
+          <div className="relative flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-lg bg-[radial-gradient(circle,hsl(var(--primary)/0.6),transparent_70%)] opacity-70 blur-md" />
+              <div className="relative size-9 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
+                <Wand2 size={16} className="text-primary" />
+              </div>
             </div>
             <div className="min-w-0">
               <h2 className="font-serif text-lg font-bold text-foreground/95 leading-tight">Review enrichment</h2>
@@ -240,9 +278,13 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
                           <span className="text-[9px] font-mono text-muted-foreground/45">{c.key}</span>
                           <span className="text-[9px] uppercase tracking-wider text-primary/70">{c.dataType}</span>
                         </div>
-                        <p className="mt-1 text-xs text-foreground/80">{renderVal(c.value)}</p>
+                        {asImageUrls(c.value) ? (
+                          <div className="mt-1.5"><ThumbStrip urls={asImageUrls(c.value)!} /></div>
+                        ) : (
+                          <p className="mt-1 text-xs text-foreground/80 break-words line-clamp-3">{renderVal(c.value)}</p>
+                        )}
                         {c.reasoning && (
-                          <p className="mt-1 text-[11px] italic text-muted-foreground/55">{c.reasoning}</p>
+                          <p className="mt-1 text-[11px] italic text-muted-foreground/55 line-clamp-2">{c.reasoning}</p>
                         )}
                       </div>
                       <AcceptReject
@@ -283,7 +325,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
             <button
               onClick={() => void handleCommit()}
               disabled={busy !== null || acceptedCount === 0}
-              className="px-4 py-1.5 rounded-lg bg-success/15 border border-success/30 text-success text-xs font-semibold hover:bg-success/25 disabled:opacity-40 flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-lg bg-gradient-to-b from-success to-success/85 text-background text-xs font-semibold shadow-lg shadow-success/25 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40 disabled:shadow-none flex items-center gap-1.5"
             >
               {busy === "commit" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
               {commitLabel ?? "Commit"} {acceptedCount > 0 ? acceptedCount : ""}
@@ -321,12 +363,17 @@ function FieldRow({
   const afterShown =
     state.decision === "edit" && state.editedValue !== undefined
       ? state.editedValue
-      : renderVal(field.after);
+      : String(field.after ?? "");
+  const longString = typeof field.after === "string" && field.after.length > 80;
+
+  const afterImgs = state.decision === "edit" ? null : asImageUrls(field.after);
+  const beforeImgs = asImageUrls(field.before);
+  const hasBefore = field.before != null && field.before !== "";
 
   return (
     <div
       className={[
-        "rounded-lg border px-4 py-3 transition-colors",
+        "rounded-xl border px-4 py-3 transition-colors",
         !field.valid
           ? "border-warning/40 bg-warning/[0.04]"
           : accepted
@@ -347,27 +394,48 @@ function FieldRow({
             )}
           </div>
 
-          <div className="mt-1.5 flex items-start gap-2 text-xs">
-            {field.before != null && field.before !== "" && (
-              <>
-                <span className="text-muted-foreground/45 line-through break-words">{renderVal(field.before)}</span>
-                <ArrowRight size={12} className="mt-0.5 text-muted-foreground/35 shrink-0" />
-              </>
-            )}
+          <div className="mt-2 space-y-1.5">
+            {/* AFTER — the proposed value (focus) */}
             {state.decision === "edit" ? (
-              <input
-                value={String(afterShown)}
-                onChange={(e) => onChange({ decision: "edit", editedValue: e.target.value })}
-                className="flex-1 bg-card border border-primary/40 rounded-md px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary/70"
-                autoFocus
-              />
+              longString ? (
+                <textarea
+                  value={String(afterShown)}
+                  onChange={(e) => onChange({ decision: "edit", editedValue: e.target.value })}
+                  rows={4}
+                  className="w-full bg-card border border-primary/40 rounded-lg px-2.5 py-1.5 text-xs leading-relaxed text-foreground focus:outline-none focus:border-primary/70 resize-y"
+                  autoFocus
+                />
+              ) : (
+                <input
+                  value={String(afterShown)}
+                  onChange={(e) => onChange({ decision: "edit", editedValue: e.target.value })}
+                  className="w-full bg-card border border-primary/40 rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary/70"
+                  autoFocus
+                />
+              )
+            ) : afterImgs ? (
+              <ThumbStrip urls={afterImgs} />
             ) : (
-              <span className="text-foreground/85 break-words">{renderVal(field.after)}</span>
+              <p className="text-sm text-foreground/90 break-words whitespace-pre-wrap line-clamp-4">{renderVal(field.after)}</p>
+            )}
+
+            {/* BEFORE — the value being replaced (secondary) */}
+            {hasBefore && state.decision !== "edit" && (
+              beforeImgs ? (
+                <p className="text-[11px] text-muted-foreground/45">
+                  Replacing {beforeImgs.length} current image{beforeImgs.length === 1 ? "" : "s"}
+                </p>
+              ) : (
+                <p className="flex items-baseline gap-1.5 text-[11px] text-muted-foreground/40">
+                  <span className="shrink-0 font-semibold uppercase tracking-wider">was</span>
+                  <span className="line-through line-clamp-2 break-words">{renderVal(field.before)}</span>
+                </p>
+              )
             )}
           </div>
 
           {field.reasoning && state.decision !== "edit" && (
-            <p className="mt-1 text-[11px] italic text-muted-foreground/50 line-clamp-2">{field.reasoning}</p>
+            <p className="mt-1.5 text-[11px] italic text-muted-foreground/50 line-clamp-2">{field.reasoning}</p>
           )}
         </div>
 

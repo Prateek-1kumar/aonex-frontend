@@ -2,13 +2,14 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor, Loader2, Store } from "lucide-react";
+import { Upload, Link2, Plus, CheckCircle2, AlertCircle, Monitor, Loader2, Store, DownloadCloud } from "lucide-react";
 import Nango from "@nangohq/frontend";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { detectRetailer } from "./lib/per-site-detection";
 import { RecentIngestions } from "./components/RecentIngestions";
 import { TraceModal } from "./components/TraceModal";
+import { PageHero } from "@/components/ui/page-chrome";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -115,19 +116,19 @@ export default function IngestionPage() {
   }
 
   return (
-    <div className="animate-in w-full max-w-7xl mx-auto px-4 py-8">
+    <div className="animate-in w-full pb-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="font-serif text-4xl font-bold text-foreground">Ingestion Terminal</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Bring product data into Aonex — from a file, a marketplace link, or a connected store.
-        </p>
-      </div>
+      <PageHero
+        icon={<DownloadCloud size={22} strokeWidth={1.6} />}
+        eyebrow="Data Intake"
+        title="Ingestion Terminal"
+        description="Bring product data into Aonex — from a file, a marketplace link, or a connected store."
+      />
 
       {/* Toast */}
       {toast && (
         <div className={[
-          "mb-6 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
+          "mb-6 flex items-center gap-3 px-4 py-3 rounded-xl text-sm shadow-lg",
           toast.type === "success"
             ? "bg-success/10 border border-success/20 text-success"
             : "bg-danger/10 border border-danger/20 text-danger",
@@ -148,12 +149,19 @@ export default function IngestionPage() {
           onDrop={onDrop}
           onClick={() => fileRef.current?.click()}
           className={[
-            "col-span-3 flex flex-col items-center justify-center gap-5 rounded-xl border transition-all duration-200 cursor-pointer min-h-[340px]",
+            "group relative col-span-3 flex flex-col items-center justify-center gap-5 overflow-hidden rounded-2xl border transition-all duration-300 cursor-pointer min-h-[340px] shadow-sm",
             dragging
-              ? "border-primary/40 bg-primary/5"
-              : "border-border/[0.08] bg-card hover:border-border/[0.14] hover:bg-surface-hover",
+              ? "border-primary/50 bg-primary/[0.06] shadow-lg shadow-primary/10 ring-1 ring-primary/20"
+              : "border-dashed border-border/[0.14] bg-card hover:border-primary/30 hover:shadow-lg",
           ].join(" ")}
         >
+          {/* texture + aura backdrop */}
+          <div className="pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(circle_at_center,black,transparent_75%)] bg-[radial-gradient(hsl(var(--foreground)/0.05)_1px,transparent_1px)] bg-[size:18px_18px]" />
+          <div className={[
+            "pointer-events-none absolute left-1/2 top-1/2 size-72 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl transition-opacity duration-300 bg-[radial-gradient(circle,hsl(var(--primary)/0.4),transparent_70%)]",
+            dragging ? "opacity-70" : "opacity-0 group-hover:opacity-40",
+          ].join(" ")} />
+
           <input
             ref={fileRef}
             type="file"
@@ -161,15 +169,21 @@ export default function IngestionPage() {
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
           />
-          <div className={[
-            "size-16 rounded-2xl flex items-center justify-center transition-all duration-200",
-            dragging ? "bg-primary/15 text-primary ring-4 ring-primary/10" : "bg-surface text-muted-foreground",
-          ].join(" ")}>
-            {busy === "file"
-              ? <Loader2 size={28} className="animate-spin" />
-              : <Upload size={28} strokeWidth={1.5} />}
+          <div className="relative">
+            <div className={[
+              "absolute inset-0 rounded-2xl blur-md transition-opacity duration-300 bg-[radial-gradient(circle,hsl(var(--primary)/0.6),transparent_70%)]",
+              dragging || busy === "file" ? "opacity-80" : "opacity-0 group-hover:opacity-60",
+            ].join(" ")} />
+            <div className={[
+              "relative grid size-16 place-items-center rounded-2xl border transition-all duration-300",
+              dragging ? "border-primary/40 bg-primary/15 text-primary scale-105" : "border-border/[0.1] bg-surface text-muted-foreground group-hover:text-primary group-hover:border-primary/25",
+            ].join(" ")}>
+              {busy === "file"
+                ? <Loader2 size={28} className="animate-spin" />
+                : <Upload size={28} strokeWidth={1.5} />}
+            </div>
           </div>
-          <div className="text-center">
+          <div className="relative text-center">
             <p className="font-serif text-xl font-semibold text-foreground/90">
               {busy === "file" ? "Processing…" : dragging ? "Drop to ingest" : "Upload a product file"}
             </p>
@@ -190,9 +204,9 @@ export default function IngestionPage() {
               href="/aonex-catalog-template.csv"
               download
               onClick={(e) => e.stopPropagation()}
-              className="mt-5 inline-block text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-3 py-1.5 text-xs font-medium text-primary hover:bg-surface-hover transition-colors"
             >
-              Download CSV template
+              <DownloadCloud size={13} /> Download CSV template
             </a>
           </div>
         </div>
@@ -200,9 +214,11 @@ export default function IngestionPage() {
         {/* Right column — 2 cols */}
         <div className="col-span-2 flex flex-col gap-4">
           {/* External link */}
-          <div className="rounded-xl border border-border/[0.08] bg-card p-5 flex-1">
-            <div className="flex items-center gap-2 mb-4">
-              <Link2 size={14} className="text-primary" />
+          <div className="rounded-2xl border border-border/[0.08] bg-card p-5 flex-1 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="grid size-7 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                <Link2 size={14} />
+              </span>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 External Link
               </p>
@@ -244,9 +260,9 @@ export default function IngestionPage() {
                 <button
                   onClick={() => void handleUrl()}
                   disabled={busy === "url" || !url.trim()}
-                  className="px-4 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+                  className="px-4 rounded-lg bg-gradient-to-b from-primary to-primary/85 text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110 active:translate-y-px flex items-center justify-center shrink-0 transition-all disabled:opacity-40 disabled:shadow-none"
                 >
-                  <Plus size={16} />
+                  {busy === "url" ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 </button>
               </div>
             </div>
@@ -256,9 +272,11 @@ export default function IngestionPage() {
           </div>
 
           {/* Connectors */}
-          <div className="rounded-xl border border-border/[0.08] bg-card p-5 flex-1">
-            <div className="flex items-center gap-2 mb-4">
-              <Store size={14} className="text-primary" />
+          <div className="rounded-2xl border border-border/[0.08] bg-card p-5 flex-1 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="grid size-7 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                <Store size={14} />
+              </span>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Connect a Store
               </p>
@@ -293,22 +311,23 @@ export default function IngestionPage() {
       {/* Active sources strip */}
       {conns.length > 0 && (
         <div className="mt-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 mb-3 flex items-center gap-2">
+            <span className="h-px w-5 bg-gradient-to-r from-primary/60 to-transparent" />
             Active Sources
           </p>
-          <div className="rounded-xl border border-border/[0.07] bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border/[0.07] bg-card overflow-hidden shadow-sm">
             {conns.map((c, i) => (
               <div
                 key={c.marketplace}
                 className={[
-                  "flex items-center justify-between px-5 py-3.5",
+                  "flex items-center justify-between px-5 py-3.5 hover:bg-surface-hover transition-colors",
                   i > 0 ? "border-t border-border/[0.06]" : "",
                 ].join(" ")}
               >
                 <div className="flex items-center gap-3">
                   <div className={[
                     "size-1.5 rounded-full",
-                    c.status === "active" ? "bg-success" : "bg-warning",
+                    c.status === "active" ? "bg-success animate-soft-pulse" : "bg-warning",
                   ].join(" ")} />
                   <span className="text-sm font-medium capitalize text-foreground/90">
                     {c.marketplace}

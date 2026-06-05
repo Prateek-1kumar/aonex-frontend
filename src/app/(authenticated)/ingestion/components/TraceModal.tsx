@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, AlertCircle, Loader2, Copy, Check, ExternalLink } from "lucide-react";
+import { X, AlertCircle, Loader2, Copy, Check, ExternalLink, ScrollText } from "lucide-react";
 import { api, type IngestionTrace } from "@/lib/api";
 import Link from "next/link";
 
@@ -65,25 +65,31 @@ export function TraceModal({ artifactId, onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[88vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
+        className="relative w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden rounded-2xl border border-border/[0.1] bg-card shadow-2xl animate-modal-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06]">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-              Ingestion Trace
-            </p>
-            <p className="mt-0.5 text-sm font-mono text-foreground/90 truncate">
-              {trace?.artifact?.source_external_id ?? trace?.filename ?? artifactId}
-            </p>
+        <div className="relative flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-gradient-to-b from-surface/50 to-transparent">
+          <div className="pointer-events-none absolute -left-10 -top-16 size-52 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.35),transparent_70%)] opacity-50 blur-2xl" />
+          <div className="relative flex items-center gap-3 min-w-0">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/12 text-primary">
+              <ScrollText size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                Ingestion Trace
+              </p>
+              <p className="mt-0.5 text-sm font-mono text-foreground/90 truncate">
+                {trace?.artifact?.source_external_id ?? trace?.filename ?? artifactId}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center shrink-0"
+            className="relative size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center shrink-0 transition-colors"
             aria-label="Close"
           >
             <X size={15} />

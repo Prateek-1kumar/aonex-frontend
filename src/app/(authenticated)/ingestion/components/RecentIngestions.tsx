@@ -132,10 +132,12 @@ export function RecentIngestions({ onRowClick, refreshSignal }: Props) {
   }, [items]);
 
   return (
-    <div className="rounded-xl border border-border/[0.07] bg-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border/[0.06]">
-        <div className="flex items-center gap-2">
-          <Sparkles size={12} className="text-primary" />
+    <div className="rounded-2xl border border-border/[0.07] bg-card overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/[0.06] bg-gradient-to-b from-surface/40 to-transparent">
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-7 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+            <Sparkles size={13} />
+          </span>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
             Recent Ingestions
           </p>

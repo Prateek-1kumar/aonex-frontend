@@ -183,16 +183,17 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
+        className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl animate-modal-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl overflow-hidden">
+          <div className="pointer-events-none absolute -left-10 -top-16 size-52 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.3),transparent_70%)] opacity-50 blur-2xl" />
+          <div className="relative flex items-center gap-3 min-w-0">
             {product && (
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${catalogStatusBadge(product.status).className}`}>
                 {catalogStatusBadge(product.status).label}
@@ -274,7 +275,7 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
               <button
                 onClick={() => void handlePushToEnrich()}
                 disabled={pushing}
-                className="px-3.5 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25 disabled:opacity-40 flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-lg bg-gradient-to-b from-primary to-primary/85 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/25 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40 disabled:shadow-none flex items-center gap-1.5"
               >
                 {pushing ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
                 {pushing ? "Pushing…" : "Push to Enrich"}

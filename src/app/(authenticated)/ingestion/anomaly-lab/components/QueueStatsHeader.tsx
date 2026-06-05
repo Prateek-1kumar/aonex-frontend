@@ -8,7 +8,7 @@ interface QueueStatsHeaderProps {
 
 export function QueueStatsHeader({ stats, count }: QueueStatsHeaderProps) {
   return (
-    <div className="flex items-center gap-4 flex-wrap px-5 py-3 rounded-xl border border-border/[0.08] bg-card">
+    <div className="flex items-center gap-4 flex-wrap px-5 py-3 rounded-2xl border border-border/[0.08] bg-card shadow-sm">
       {/* Count */}
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
