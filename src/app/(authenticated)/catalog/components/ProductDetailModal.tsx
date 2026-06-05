@@ -345,7 +345,20 @@ export function ProductDetailModal({ productId, onClose, onDelete }: Props) {
           </div>
         )}
       </div>
-    </div>,
+    </div>
+
+    {enrichProposal && (
+      <EnrichReviewDrawer
+        productId={productId}
+        proposal={enrichProposal}
+        onClose={() => setEnrichProposal(null)}
+        onApplied={() => {
+          setEnrichProposal(null);
+          void reloadProduct();
+        }}
+      />
+    )}
+    </>,
     document.body
   );
 }
