@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2, RefreshCw, ArrowRight, History as HistoryIcon, ExternalLink, Undo2,
-  CheckCircle2, AlertCircle,
+  CheckCircle2, AlertCircle, TrendingUp,
 } from "lucide-react";
 import { api, type ProposalListItem } from "@/lib/api";
+import { PageHero, StatCard } from "@/components/ui/page-chrome";
+import { loadCatalogTitles } from "@/lib/catalog-titles";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -25,6 +27,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [reverting, setReverting] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((t: Toast) => {
@@ -62,26 +65,52 @@ export default function HistoryPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadCatalogTitles().then(setTitles).catch(() => {}); }, []);
+
+  const titleOf = useCallback(
+    (p: ProposalListItem) => p.title ?? titles.get(p.productId) ?? null,
+    [titles]
+  );
+
+  const kpis = useMemo(() => {
+    let uplift = 0;
+    for (const p of items) {
+      uplift += Math.round(p.scoreAfter?.completeness ?? 0) - Math.round(p.scoreBefore?.completeness ?? 0);
+    }
+    return { synced: items.length, avgUplift: items.length ? Math.round(uplift / items.length) : 0 };
+  }, [items]);
 
   return (
-    <div className="animate-in mx-auto max-w-5xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-bold text-foreground/95">History</h1>
-          <p className="mt-1 text-sm text-muted-foreground/65">Enrichments that have been synced to the catalog.</p>
+    <div className="animate-in w-full">
+      <PageHero
+        icon={<HistoryIcon size={22} strokeWidth={1.6} />}
+        eyebrow="Enrichment"
+        title="History"
+        description="Enrichments that have been synced to the catalog. Revert any sync to restore the previous values."
+        actions={
+          <button onClick={() => void load()} className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground transition-colors flex items-center gap-1.5">
+            <RefreshCw size={13} /> Refresh
+          </button>
+        }
+      >
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
+          <StatCard icon={<CheckCircle2 size={16} />} label="Synced" value={kpis.synced} tone="success" />
+          <StatCard icon={<TrendingUp size={16} />} label="Avg Uplift" value={`+${kpis.avgUplift}`} hint="pts" tone="primary" />
         </div>
-        <button onClick={() => void load()} className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5">
-          <RefreshCw size={13} /> Refresh
-        </button>
-      </div>
+      </PageHero>
 
-      <div className="mt-6 rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+      <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground/60"><Loader2 size={16} className="animate-spin" /> Loading…</div>
         ) : items.length === 0 ? (
           <div className="py-16 text-center">
-            <HistoryIcon size={28} className="mx-auto text-muted-foreground/25" strokeWidth={1.5} />
-            <p className="mt-3 text-sm text-muted-foreground/55">Nothing synced yet.</p>
+            <div className="relative mx-auto mb-4 w-fit">
+              <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--primary)/0.35),transparent_70%)] opacity-50 blur-lg" />
+              <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/40">
+                <HistoryIcon size={24} strokeWidth={1.5} />
+              </div>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground/55">Nothing synced yet.</p>
           </div>
         ) : (
           <div className="divide-y divide-border/[0.04]">
@@ -89,9 +118,9 @@ export default function HistoryPage() {
               const before = Math.round(p.scoreBefore?.completeness ?? 0);
               const after = Math.round(p.scoreAfter?.completeness ?? 0);
               return (
-                <div key={p.proposalId} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-4 py-3.5 items-center">
+                <div key={p.proposalId} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-4 py-3.5 items-center hover:bg-surface-hover transition-colors">
                   <div className="min-w-0">
-                    <p className="text-sm text-foreground/90 truncate">{p.title ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
+                    <p className="text-sm font-medium text-foreground/90 truncate">{titleOf(p) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground/55 uppercase tracking-wider">{p.archetype ?? "generic"} · {p.fieldCount} fields</p>
                   </div>
                   <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">

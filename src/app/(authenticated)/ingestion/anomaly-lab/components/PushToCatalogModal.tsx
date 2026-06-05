@@ -156,16 +156,17 @@ export function PushToCatalogModal({ item, onClose, onResolved }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/70 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-overlay/80 backdrop-blur-md animate-fade-in"
       onClick={() => { if (!busy) onClose(); }}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-border/[0.1] bg-card shadow-2xl"
+        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden rounded-2xl border border-border/[0.1] bg-card shadow-2xl animate-modal-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-10 flex items-center gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur rounded-t-2xl">
-          <div className="size-12 rounded-xl bg-surface border border-border/[0.08] overflow-hidden flex items-center justify-center shrink-0">
+        <div className="sticky top-0 z-10 flex items-center gap-4 px-6 py-4 border-b border-border/[0.06] bg-card/95 backdrop-blur">
+          <div className="pointer-events-none absolute -left-12 -top-16 size-56 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.3),transparent_70%)] opacity-50 blur-2xl" />
+          <div className="relative size-12 rounded-xl bg-surface border border-border/[0.08] overflow-hidden flex items-center justify-center shrink-0">
             {hero ? (
               // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URL
               <img src={hero} alt="" className="size-full object-cover"
@@ -299,7 +300,7 @@ export function PushToCatalogModal({ item, onClose, onResolved }: Props) {
             <button
               onClick={() => void handleApprove()}
               disabled={!canApprove || !!busy}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-success/15 border border-success/30 text-success text-sm font-semibold hover:bg-success/25 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-gradient-to-b from-success to-success/85 text-background text-sm font-semibold shadow-lg shadow-success/25 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40 disabled:shadow-none"
             >
               {busy === "approve" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
               Push to Catalog

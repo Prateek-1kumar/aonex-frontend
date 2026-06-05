@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2, RefreshCw, CheckCircle2, AlertCircle, ArrowRight, Sparkles, ChevronRight,
-  ChevronLeft, Wand2,
+  ChevronLeft, Wand2, GitCommitVertical, TrendingUp,
 } from "lucide-react";
 import {
   api,
@@ -14,6 +14,8 @@ import {
   type EnrichGroup,
   type EnrichFieldDecision,
 } from "@/lib/api";
+import { PageHero, StatCard } from "@/components/ui/page-chrome";
+import { loadCatalogTitles } from "@/lib/catalog-titles";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -48,6 +50,7 @@ export default function ReviewCommitPage() {
   const [selected, setSelected] = useState<EnrichmentProposalView | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((t: Toast) => {
@@ -69,6 +72,25 @@ export default function ReviewCommitPage() {
   }, [showToast]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadCatalogTitles().then(setTitles).catch(() => {}); }, []);
+
+  const titleOf = useCallback(
+    (p: ProposalListItem) => p.title ?? titles.get(p.productId) ?? null,
+    [titles]
+  );
+
+  const kpis = useMemo(() => {
+    let uplift = 0, fields = 0;
+    for (const p of list) {
+      uplift += Math.round(p.scoreAfter?.completeness ?? 0) - Math.round(p.scoreBefore?.completeness ?? 0);
+      fields += p.fieldCount;
+    }
+    return {
+      waiting: list.length,
+      avgUplift: list.length ? Math.round(uplift / list.length) : 0,
+      fields,
+    };
+  }, [list]);
 
   async function openDetail(item: ProposalListItem) {
     setOpening(item.proposalId);
@@ -86,6 +108,7 @@ export default function ReviewCommitPage() {
     return (
       <ReviewDetail
         proposal={selected}
+        fallbackTitle={titles.get(selected.productId) ?? null}
         onBack={() => setSelected(null)}
         onSynced={(score) => {
           setSelected(null);
@@ -98,25 +121,37 @@ export default function ReviewCommitPage() {
   }
 
   return (
-    <div className="animate-in mx-auto max-w-5xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-bold text-foreground/95">Review &amp; Commit</h1>
-          <p className="mt-1 text-sm text-muted-foreground/65">
-            Confirm the accepted changes for each draft and sync the enriched schema back to the catalog.
-          </p>
+    <div className="animate-in w-full">
+      <PageHero
+        icon={<GitCommitVertical size={22} strokeWidth={1.6} />}
+        eyebrow="Enrichment"
+        title="Review & Commit"
+        description="Confirm the accepted changes for each draft and sync the enriched schema back to the catalog."
+        actions={
+          <>
+            <Link href="/enrichment" className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground transition-colors">Drafting Room</Link>
+            <button onClick={() => void load()} className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground transition-colors flex items-center gap-1.5"><RefreshCw size={13} /> Refresh</button>
+          </>
+        }
+      >
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard icon={<CheckCircle2 size={16} />} label="Waiting to Sync" value={kpis.waiting} tone="primary" />
+          <StatCard icon={<TrendingUp size={16} />} label="Avg Uplift" value={`+${kpis.avgUplift}`} hint="pts" tone="success" />
+          <StatCard icon={<Sparkles size={16} />} label="Fields" value={kpis.fields} tone="muted" />
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/enrichment" className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover">Drafting Room</Link>
-          <button onClick={() => void load()} className="px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover flex items-center gap-1.5"><RefreshCw size={13} /> Refresh</button>
-        </div>
-      </div>
+      </PageHero>
 
-      <div className="mt-6 rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+      <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground/60"><Loader2 size={16} className="animate-spin" /> Loading drafts…</div>
         ) : list.length === 0 ? (
           <div className="py-16 text-center">
+            <div className="relative mx-auto mb-5 w-fit">
+              <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--success)/0.45),transparent_70%)] opacity-50 blur-lg" />
+              <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/45">
+                <CheckCircle2 size={24} strokeWidth={1.5} />
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground/55">No drafts waiting to sync.</p>
             <Link href="/enrichment" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">Go to Drafting Room <ArrowRight size={13} /></Link>
           </div>
@@ -128,7 +163,7 @@ export default function ReviewCommitPage() {
               return (
                 <button key={p.proposalId} onClick={() => void openDetail(p)} disabled={opening !== null} className="w-full grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-3.5 items-center text-left hover:bg-surface-hover transition-colors disabled:opacity-60">
                   <div className="min-w-0">
-                    <p className="text-sm text-foreground/90 truncate">{p.title ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
+                    <p className="text-sm font-medium text-foreground/90 truncate">{titleOf(p) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
                     <p className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
                       <span className="uppercase tracking-wider">{p.archetype ?? "generic"}</span>
                       <span>· {p.fieldCount} fields</span>
@@ -160,9 +195,10 @@ export default function ReviewCommitPage() {
 // ── Detail (Image-6 style) ───────────────────────────────────────────────────
 
 function ReviewDetail({
-  proposal, onBack, onSynced, onError,
+  proposal, fallbackTitle, onBack, onSynced, onError,
 }: {
   proposal: EnrichmentProposalView;
+  fallbackTitle: string | null;
   onBack: () => void;
   onSynced: (score: number) => void;
   onError: (m: string) => void;
@@ -177,6 +213,7 @@ function ReviewDetail({
   const title =
     (proposal.fields.find((f) => f.attributeCode === "title" && (f.decision === "accept" || f.decision === "edit")) &&
       String(afterValue(proposal.fields.find((f) => f.attributeCode === "title")!))) ||
+    fallbackTitle ||
     "Product";
 
   async function handleSync() {
@@ -197,7 +234,7 @@ function ReviewDetail({
   }
 
   return (
-    <div className="animate-in mx-auto max-w-6xl">
+    <div className="animate-in w-full">
       <button onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-foreground">
         <ChevronLeft size={14} /> Back to drafts
       </button>
@@ -281,7 +318,7 @@ function ReviewDetail({
           <button
             onClick={() => void handleSync()}
             disabled={busy || accepted.length + acceptedCandidates.length === 0}
-            className="w-full px-4 py-3 rounded-xl bg-primary/15 border border-primary/30 text-primary text-sm font-bold uppercase tracking-wider hover:bg-primary/25 disabled:opacity-40 flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 rounded-xl bg-gradient-to-b from-primary to-primary/85 text-primary-foreground text-sm font-bold uppercase tracking-wider shadow-lg shadow-primary/30 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
             Sync to Catalog

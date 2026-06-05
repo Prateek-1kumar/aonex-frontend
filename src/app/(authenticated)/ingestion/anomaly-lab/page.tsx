@@ -3,12 +3,14 @@
 import { useEffect, useCallback, useMemo, useState, Suspense } from "react";
 import {
   CheckCircle2, AlertCircle, Loader2, RefreshCw, Search, Package, ChevronRight,
+  FlaskConical, AlertTriangle, Link2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatPrice, formatRelativeTime } from "@/lib/format";
 import type { QueueItem, QueueStats } from "./lib/lab-types";
 import { QueueStatsHeader } from "./components/QueueStatsHeader";
 import { PushToCatalogModal } from "./components/PushToCatalogModal";
+import { PageHero, StatCard } from "@/components/ui/page-chrome";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
@@ -106,25 +108,41 @@ function AnomalyLabPageContent() {
     [queue, selectedId]
   );
 
+  const kpis = useMemo(() => {
+    let ready = 0, needsInfo = 0, withMatch = 0;
+    for (const i of queue) {
+      if (i.missingFields.length === 0) ready += 1; else needsInfo += 1;
+      if (i.candidateCount > 0) withMatch += 1;
+    }
+    return { awaiting: stats?.total ?? queue.length, ready, needsInfo, withMatch };
+  }, [queue, stats]);
+
   return (
     <div className="animate-in flex flex-col gap-4 pb-10">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-4xl font-bold text-foreground">Anomaly Lab</h1>
-          <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Review &amp; push to catalog
-          </p>
+      <PageHero
+        icon={<FlaskConical size={22} strokeWidth={1.6} />}
+        eyebrow="Review Queue"
+        title="Anomaly Lab"
+        description="Inspect staged products that need a human check, complete what's missing, then push them to the catalog or link to an existing SKU."
+        actions={
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center disabled:opacity-40 transition-colors"
+            aria-label="Refresh queue"
+          >
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          </button>
+        }
+      >
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard icon={<Package size={16} />} label="Awaiting" value={kpis.awaiting} tone="primary" />
+          <StatCard icon={<CheckCircle2 size={16} />} label="Ready" value={kpis.ready} tone="success" />
+          <StatCard icon={<AlertTriangle size={16} />} label="Needs Info" value={kpis.needsInfo} tone="warning" />
+          <StatCard icon={<Link2 size={16} />} label="Has Match" value={kpis.withMatch} tone="muted" />
         </div>
-        <button
-          onClick={() => void load()}
-          disabled={loading}
-          className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center disabled:opacity-40"
-          aria-label="Refresh queue"
-        >
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-        </button>
-      </div>
+      </PageHero>
 
       {/* Summary */}
       <QueueStatsHeader stats={stats} count={stats?.total ?? queue.length} />
@@ -160,20 +178,25 @@ function AnomalyLabPageContent() {
           <p className="text-sm text-muted-foreground">Loading queue…</p>
         </div>
       ) : queue.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <CheckCircle2 size={40} className="text-success mb-4" strokeWidth={1.5} />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border/[0.08] bg-card py-24 text-center shadow-sm">
+          <div className="relative mb-5">
+            <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--success)/0.5),transparent_70%)] opacity-60 blur-lg" />
+            <div className="relative grid size-14 place-items-center rounded-2xl border border-success/25 bg-success/10 text-success">
+              <CheckCircle2 size={26} strokeWidth={1.6} />
+            </div>
+          </div>
           <p className="font-serif text-lg font-semibold text-foreground/80">All clear — nothing staged</p>
           <p className="mt-1 text-sm text-muted-foreground">
             New items appear here when ingestion needs your review before publishing.
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-border/[0.08] bg-card p-12 text-center">
+        <div className="rounded-2xl border border-border/[0.08] bg-card p-12 text-center shadow-sm">
           <p className="font-serif text-lg font-semibold text-foreground/80">Nothing matches “{search}”.</p>
           <p className="mt-1 text-sm text-muted-foreground">Try a different search.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/[0.08] bg-card overflow-hidden">
+        <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
           {filtered.map((item) => (
             <QueueRow
               key={item.stagedProductId}
