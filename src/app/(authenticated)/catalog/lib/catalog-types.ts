@@ -41,6 +41,10 @@ export interface ListCatalogProductRow {
    * (hero image preferred). Null when the product has no images.
    */
   imageUrl: string | null;
+  /** Server-authoritative completeness score (0..100); null until first computed. */
+  completenessScore: number | null;
+  /** LLM content-quality score (0..100); null until enrichment sets it. */
+  contentQualityScore: number | null;
   _meta: { schema: "new" };
 }
 

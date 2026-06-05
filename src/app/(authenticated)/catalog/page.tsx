@@ -22,9 +22,11 @@ type Toast = { type: "success" | "error"; message: string } | null;
 type TabKey = "all" | "needs_enrichment" | "active" | "draft" | "archived";
 
 // ── Health: an honest, explainable completeness score (0–100) ───────────────
-// 20 pts each for the canonical fields we actually have in the list payload.
-// Not a fabricated metric — it reflects exactly how filled-out a SKU is.
+// Prefer the SERVER-authoritative archetype-weighted completeness_score (set by
+// the reconciler / enrichment). Fall back to a naive 5-field estimate only when
+// the backend hasn't computed one yet (legacy rows pre-scoring backfill).
 function computeHealth(p: ListCatalogProductRow): number {
+  if (p.completenessScore != null) return Math.round(p.completenessScore);
   let s = 0;
   if (p.title) s += 20;
   if (p.brand) s += 20;
