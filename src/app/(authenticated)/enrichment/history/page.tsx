@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, ArrowRight, History as HistoryIcon, ExternalLink } from "lucide-react";
+import {
+  Loader2, RefreshCw, ArrowRight, History as HistoryIcon, ExternalLink, Undo2,
+  CheckCircle2, AlertCircle,
+} from "lucide-react";
 import { api, type ProposalListItem } from "@/lib/api";
+
+type Toast = { type: "success" | "error"; message: string } | null;
 
 function fmt(ts: string): string {
   try {
@@ -18,6 +23,31 @@ function fmt(ts: string): string {
 export default function HistoryPage() {
   const [items, setItems] = useState<ProposalListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reverting, setReverting] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((t: Toast) => {
+    setToast(t);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const handleRevert = useCallback(
+    async (item: ProposalListItem) => {
+      setReverting(item.proposalId);
+      try {
+        await api.enrich.revert(item.productId, item.proposalId);
+        setItems((prev) => prev.filter((x) => x.proposalId !== item.proposalId));
+        showToast({ type: "success", message: "Reverted — catalog restored" });
+      } catch (e) {
+        showToast({ type: "error", message: (e as Error).message });
+      } finally {
+        setReverting(null);
+      }
+    },
+    [showToast]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,7 +89,7 @@ export default function HistoryPage() {
               const before = Math.round(p.scoreBefore?.completeness ?? 0);
               const after = Math.round(p.scoreAfter?.completeness ?? 0);
               return (
-                <div key={p.proposalId} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3.5 items-center">
+                <div key={p.proposalId} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-4 py-3.5 items-center">
                   <div className="min-w-0">
                     <p className="text-sm text-foreground/90 truncate">{p.title ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground/55 uppercase tracking-wider">{p.archetype ?? "generic"} · {p.fieldCount} fields</p>
@@ -70,6 +100,15 @@ export default function HistoryPage() {
                     <span className="text-sm font-bold tabular-nums text-success">{after}</span>
                   </div>
                   <span className="text-[11px] text-muted-foreground/45 tabular-nums w-28 text-right">{fmt(p.updatedAt)}</span>
+                  <button
+                    onClick={() => void handleRevert(p)}
+                    disabled={reverting !== null}
+                    className="px-2.5 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-[11px] font-semibold text-foreground/60 hover:bg-danger/10 hover:text-danger disabled:opacity-40 flex items-center gap-1.5"
+                    title="Undo this enrichment"
+                  >
+                    {reverting === p.proposalId ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                    Revert
+                  </button>
                   <Link href={`/catalog?id=${encodeURIComponent(p.productId)}`} className="text-muted-foreground/50 hover:text-primary" title="View in catalog">
                     <ExternalLink size={14} />
                   </Link>
@@ -79,6 +118,13 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm shadow-lg ${toast.type === "success" ? "bg-success/15 border-success/30 text-success" : "bg-danger/15 border-danger/30 text-danger"}`}>
+          {toast.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
