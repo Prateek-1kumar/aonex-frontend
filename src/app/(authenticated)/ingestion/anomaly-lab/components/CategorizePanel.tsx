@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   AlertCircle,
@@ -146,6 +146,14 @@ interface UncategorizedCardProps {
 function UncategorizedCard({ item, busy, onCategorize }: UncategorizedCardProps) {
   const [pickerSelected, setPickerSelected] = useState<TaxonomyNodeHit | null>(null);
 
+  // The classifier prepends its top pick to its own alternatives, so the same
+  // node can appear twice — dedupe (keeping the highest-scoring first hit) to
+  // keep React keys unique and avoid showing a category chip twice.
+  const suggestions = useMemo(() => {
+    const seen = new Set<string>();
+    return item.suggestions.filter((s) => (seen.has(s.nodeId) ? false : (seen.add(s.nodeId), true)));
+  }, [item.suggestions]);
+
   function handlePickerSelect(node: TaxonomyNodeHit) {
     setPickerSelected(node);
   }
@@ -186,14 +194,14 @@ function UncategorizedCard({ item, busy, onCategorize }: UncategorizedCardProps)
 
       {/* Suggestions */}
       <div className="px-5 py-4 space-y-3">
-        {item.suggestions.length > 0 && (
+        {suggestions.length > 0 && (
           <div className="space-y-2">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/55">
               <Sparkles size={10} className="text-primary/70" />
               Classifier suggestions
             </p>
             <div className="flex flex-wrap gap-2">
-              {item.suggestions.map((s) => {
+              {suggestions.map((s) => {
                 const pct = Math.round(s.score * 100);
                 // Confidence tier drives the chip appearance
                 const isHigh = s.score >= 0.75;
