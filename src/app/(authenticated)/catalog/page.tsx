@@ -240,13 +240,14 @@ function CatalogPageContent() {
         </div>
       )}
 
-      {/* Two-column layout */}
-      <div className="flex gap-6 items-start">
+      {/* Two-column layout — GRID (not flex): position:sticky on a flex child
+          fails to pin in this app's scroll container, but works in a grid track
+          (same pattern as the enrichment Review-Commit side panel). */}
+      <div className="grid grid-cols-1 md:grid-cols-[14rem_minmax(0,1fr)] gap-6 items-start">
         {/* ── Left rail ────────────────────────────────────────────── */}
-        {/* Sticky on the <aside>; the inner wrapper owns the scroll. Keeping
-            overflow off the sticky element itself is what makes it pin reliably
-            inside the layout's scroll container. */}
-        <aside className="hidden md:block w-56 shrink-0 self-start sticky top-4">
+        {/* Sticky on the <aside>; the inner wrapper owns the scroll so overflow
+            never sits on the sticky element itself. */}
+        <aside className="hidden md:block self-start sticky top-4">
           <div className="max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin rounded-2xl border border-border/[0.08] bg-card shadow-sm p-3">
             {treeNodes === null ? (
               /* Tree loading placeholder */
@@ -273,7 +274,7 @@ function CatalogPageContent() {
         </aside>
 
         {/* ── Main area ─────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0">
           {/* Search bar */}
           <div className="mb-4 relative">
             <Search
