@@ -243,28 +243,33 @@ function CatalogPageContent() {
       {/* Two-column layout */}
       <div className="flex gap-6 items-start">
         {/* ── Left rail ────────────────────────────────────────────── */}
-        <aside className="hidden md:block w-56 shrink-0 sticky top-4 self-start max-h-[calc(100vh-8rem)] overflow-y-auto rounded-2xl border border-border/[0.08] bg-card shadow-sm p-3">
-          {treeNodes === null ? (
-            /* Tree loading placeholder */
-            <div className="flex flex-col gap-1.5 py-2">
-              {[100, 80, 90, 70, 85].map((w, i) => (
-                <div
-                  key={i}
-                  className="h-5 rounded-md bg-foreground/[0.05] animate-pulse"
-                  style={{ width: `${w}%` }}
-                />
-              ))}
-            </div>
-          ) : (
-            <CategoryTree
-              nodes={treeNodes}
-              uncategorizedCount={uncategorizedCount}
-              selectedNodeId={selectedNodeId}
-              uncategorizedSelected={uncategorizedSelected}
-              onSelect={handleSelectNode}
-              onSelectUncategorized={handleSelectUncategorized}
-            />
-          )}
+        {/* Sticky on the <aside>; the inner wrapper owns the scroll. Keeping
+            overflow off the sticky element itself is what makes it pin reliably
+            inside the layout's scroll container. */}
+        <aside className="hidden md:block w-56 shrink-0 self-start sticky top-4">
+          <div className="max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin rounded-2xl border border-border/[0.08] bg-card shadow-sm p-3">
+            {treeNodes === null ? (
+              /* Tree loading placeholder */
+              <div className="flex flex-col gap-1.5 py-2">
+                {[100, 80, 90, 70, 85].map((w, i) => (
+                  <div
+                    key={i}
+                    className="h-5 rounded-md bg-foreground/[0.05] animate-pulse"
+                    style={{ width: `${w}%` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <CategoryTree
+                nodes={treeNodes}
+                uncategorizedCount={uncategorizedCount}
+                selectedNodeId={selectedNodeId}
+                uncategorizedSelected={uncategorizedSelected}
+                onSelect={handleSelectNode}
+                onSelectUncategorized={handleSelectUncategorized}
+              />
+            )}
+          </div>
         </aside>
 
         {/* ── Main area ─────────────────────────────────────────────── */}
