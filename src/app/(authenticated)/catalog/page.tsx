@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  Suspense,
+} from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -8,56 +14,35 @@ import {
   RefreshCw,
   Search,
   Package,
-  SlidersHorizontal,
-  Download,
   Boxes,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import type { TaxonomyTreeNode } from "@/lib/api";
 import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
-import { getDisplayPrice } from "./lib/price";
-import { catalogStatusBadge } from "@/lib/status";
+import ProductCard from "./components/ProductCard";
+import CategoryTree from "@/components/category-tree";
+import CategoryBreadcrumb from "@/components/category-breadcrumb";
 import { PageHero } from "@/components/ui/page-chrome";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
 type Toast = { type: "success" | "error"; message: string } | null;
-type TabKey = "all" | "needs_enrichment" | "active" | "draft" | "archived";
 
-// ── Health: an honest, explainable completeness score (0–100) ───────────────
-// Prefer the SERVER-authoritative archetype-weighted completeness_score (set by
-// the reconciler / enrichment). Fall back to a naive 5-field estimate only when
-// the backend hasn't computed one yet (legacy rows pre-scoring backfill).
-function computeHealth(p: ListCatalogProductRow): number {
-  if (p.completenessScore != null) return Math.round(p.completenessScore);
-  let s = 0;
-  if (p.title) s += 20;
-  if (p.brand) s += 20;
-  if (p.category) s += 20;
-  if (p.gtin) s += 20;
-  if (p.pricing?.amount) s += 20;
-  return s;
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const NEEDS_ENRICHMENT_BELOW = 100; // anything not fully complete needs enrichment
+const PAGE_SIZE = 60;
+
+// ── Main page content ────────────────────────────────────────────────────────
 
 function CatalogPageContent() {
   const searchParams = useSearchParams();
   const idParam = searchParams.get("id");
   const router = useRouter();
 
-  const [products, setProducts] = useState<ListCatalogProductRow[]>([]);
-  const [busy, setBusy] = useState(true);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [total, setTotal] = useState<number | null>(null);
-  const PAGE_SIZE = 200;
-  const MAX_AUTOLOAD_PAGES = 25;
-  const [toast, setToast] = useState<Toast>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-  const [tab, setTab] = useState<TabKey>("all");
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  // ── Deep-link: open modal when ?id= is present ─────────────────────────────
+  const [selectedId, setSelectedId] = useState<string | null>(idParam ?? null);
 
   const handleClose = useCallback(() => {
     setSelectedId(null);
@@ -67,55 +52,118 @@ function CatalogPageContent() {
   }, [router]);
 
   useEffect(() => {
-    if (idParam) {
-      setSelectedId(idParam);
-    }
+    if (idParam) setSelectedId(idParam);
   }, [idParam]);
 
+  // ── Toast ──────────────────────────────────────────────────────────────────
+
+  const [toast, setToast] = useState<Toast>(null);
+  function showToast(t: Toast) {
+    setToast(t);
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  // ── Taxonomy tree ──────────────────────────────────────────────────────────
+
+  const [treeNodes, setTreeNodes] = useState<TaxonomyTreeNode[] | null>(null);
+  const [uncategorizedCount, setUncategorizedCount] = useState(0);
+  const [treeError, setTreeError] = useState<string | null>(null);
+
   useEffect(() => {
-    void loadAll();
+    api.catalog
+      .taxonomyTree()
+      .then(({ nodes, uncategorizedCount: uc }) => {
+        setTreeNodes(nodes);
+        setUncategorizedCount(uc);
+      })
+      .catch((e: Error) => {
+        setTreeError(e.message);
+        // Still render an empty tree so the rest of the page works
+        setTreeNodes([]);
+      });
   }, []);
 
-  // Load the first page (which carries the real `total`), render it, then stream
-  // the remaining pages so the grid shows the whole catalog and the tab/search
-  // counts are accurate — instead of being capped at one page.
-  async function loadAll() {
-    setBusy(true);
-    try {
-      const first = await api.catalog.list({ limit: PAGE_SIZE });
-      setTotal(first.total);
-      setProducts(first.products);
-      setBusy(false);
+  // ── Filter state ───────────────────────────────────────────────────────────
 
-      let cursor = first.nextCursor;
-      let pages = 1;
-      while (cursor && pages < MAX_AUTOLOAD_PAGES) {
-        setLoadingMore(true);
-        const res = await api.catalog.list({ limit: PAGE_SIZE, cursor });
-        // Dedupe against the current list (not a local set) so overlapping loads
-        // — e.g. React StrictMode's double-invoke — can't produce duplicate keys.
-        setProducts((prev) => {
-          const seen = new Set(prev.map((p) => p.id));
-          return [...prev, ...res.products.filter((p) => !seen.has(p.id))];
-        });
-        cursor = res.nextCursor;
-        pages += 1;
-      }
-      setNextCursor(cursor ?? null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [uncategorizedSelected, setUncategorizedSelected] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  // Debounced search value that drives the API call
+  const [q, setQ] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setQ(value);
+    }, 300);
+  }
+
+  function handleSelectNode(nodeId: string | null) {
+    setSelectedNodeId(nodeId);
+    setUncategorizedSelected(false);
+  }
+
+  function handleSelectUncategorized() {
+    setUncategorizedSelected(true);
+    setSelectedNodeId(null);
+  }
+
+  // ── Product list ───────────────────────────────────────────────────────────
+
+  const [products, setProducts] = useState<ListCatalogProductRow[]>([]);
+  const [busy, setBusy] = useState(true);
+  const [total, setTotal] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Stable filter signature — if this changes, reset and re-fetch
+  const filterKey = `${selectedNodeId ?? ""}|${uncategorizedSelected}|${q.trim()}`;
+  const filterKeyRef = useRef(filterKey);
+
+  async function fetchPage1(key: string) {
+    setBusy(true);
+    setProducts([]);
+    setNextCursor(null);
+    setTotal(null);
+    try {
+      const res = await api.catalog.list({
+        limit: PAGE_SIZE,
+        ...(selectedNodeId ? { category: selectedNodeId } : {}),
+        ...(uncategorizedSelected ? { uncategorized: true } : {}),
+        ...(q.trim() ? { q: q.trim() } : {}),
+      });
+      // Guard against a stale call from a previous filter
+      if (filterKeyRef.current !== key) return;
+      setProducts(res.products);
+      setNextCursor(res.nextCursor);
+      setTotal(res.total);
     } catch (e) {
+      if (filterKeyRef.current !== key) return;
       showToast({ type: "error", message: (e as Error).message });
     } finally {
-      setBusy(false);
-      setLoadingMore(false);
+      if (filterKeyRef.current === key) setBusy(false);
     }
   }
 
-  // Continue past the auto-load cap (only reached on very large catalogs).
+  useEffect(() => {
+    filterKeyRef.current = filterKey;
+    void fetchPage1(filterKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await api.catalog.list({ limit: PAGE_SIZE, cursor: nextCursor });
+      const res = await api.catalog.list({
+        limit: PAGE_SIZE,
+        cursor: nextCursor,
+        ...(selectedNodeId ? { category: selectedNodeId } : {}),
+        ...(uncategorizedSelected ? { uncategorized: true } : {}),
+        ...(q.trim() ? { q: q.trim() } : {}),
+      });
       setProducts((prev) => {
         const seen = new Set(prev.map((p) => p.id));
         return [...prev, ...res.products.filter((p) => !seen.has(p.id))];
@@ -128,99 +176,18 @@ function CatalogPageContent() {
     }
   }
 
-  function showToast(t: Toast) {
-    setToast(t);
-    setTimeout(() => setToast(null), 3500);
+  function handleRefresh() {
+    void fetchPage1(filterKey);
   }
 
-  // Health is pure over the row — memoise per product id for the render pass.
-  const healthOf = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of products) m.set(p.id, computeHealth(p));
-    return m;
-  }, [products]);
+  // ── Selected node display path (for breadcrumb) ────────────────────────────
 
-  const counts = useMemo(() => {
-    let needs = 0, active = 0, draft = 0, archived = 0, uncategorised = 0, healthSum = 0;
-    for (const p of products) {
-      const h = healthOf.get(p.id) ?? 0;
-      healthSum += h;
-      if (h < NEEDS_ENRICHMENT_BELOW) needs += 1;
-      if (!p.category) uncategorised += 1;
-      if (p.status === "active") active += 1;
-      else if (p.status === "draft") draft += 1;
-      else if (p.status === "archived") archived += 1;
-    }
-    return {
-      total: products.length,
-      needs, active, draft, archived, uncategorised,
-      avgHealth: products.length ? Math.round(healthSum / products.length) : 0,
-    };
-  }, [products, healthOf]);
+  const displayPath =
+    selectedNodeId && treeNodes
+      ? (treeNodes.find((n) => n.nodeId === selectedNodeId)?.displayPath ?? "")
+      : "";
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return products.filter((p) => {
-      if (tab === "needs_enrichment" && (healthOf.get(p.id) ?? 0) >= NEEDS_ENRICHMENT_BELOW) return false;
-      if (tab === "active" && p.status !== "active") return false;
-      if (tab === "draft" && p.status !== "draft") return false;
-      if (tab === "archived" && p.status !== "archived") return false;
-      if (!term) return true;
-      return [p.title, p.brand, p.category, p.gtin, p.id]
-        .filter(Boolean).join(" ").toLowerCase().includes(term);
-    });
-  }, [products, tab, search, healthOf]);
-
-  function exportCsv() {
-    const head = ["id", "title", "brand", "category", "gtin", "price", "status", "health"];
-    const esc = (v: unknown) => {
-      const s = v === null || v === undefined ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [head.join(",")];
-    for (const p of filtered) {
-      lines.push([
-        p.id, p.title ?? "", p.brand ?? "", p.category ?? "", p.gtin ?? "",
-        getDisplayPrice(p)?.text ?? "", p.status, `${healthOf.get(p.id) ?? 0}`,
-      ].map(esc).join(","));
-    }
-    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `catalog-export-${filtered.length}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function toggleAll() {
-    setChecked((prev) => {
-      if (prev.size >= filtered.length && filtered.length > 0) return new Set();
-      return new Set(filtered.map((p) => p.id));
-    });
-  }
-  function toggleOne(id: string) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  // Authoritative total from the backend; falls back to the loaded count until
-  // the first page resolves. Once auto-load finishes it equals products.length.
-  const realTotal = total ?? counts.total;
-
-  const TABS: { key: TabKey; label: string; count: number; dot: string }[] = [
-    { key: "all", label: "All Assets", count: realTotal, dot: "bg-primary" },
-    { key: "needs_enrichment", label: "Needs Enrichment", count: counts.needs, dot: "bg-warning" },
-    { key: "active", label: "Active", count: counts.active, dot: "bg-success" },
-    { key: "draft", label: "Draft", count: counts.draft, dot: "bg-muted-foreground" },
-    { key: "archived", label: "Archived", count: counts.archived, dot: "bg-danger" },
-  ];
-
-  const allChecked = filtered.length > 0 && checked.size >= filtered.length;
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="animate-in max-w-8xl pb-16">
@@ -229,166 +196,165 @@ function CatalogPageContent() {
         icon={<Boxes size={22} strokeWidth={1.6} />}
         eyebrow="Master Catalog"
         title="Master Catalog"
-        description="Every approved product — health, status, and pricing at a glance."
+        description="Browse every approved product by category — search, filter, and open the detail drawer."
+        actions={
+          <button
+            onClick={handleRefresh}
+            disabled={busy}
+            className="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/75 hover:bg-surface-hover disabled:opacity-40 transition-colors"
+          >
+            {busy ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <RefreshCw size={13} />
+            )}
+            Refresh
+          </button>
+        }
       />
 
-      {/* Tab bar + actions */}
-      <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {TABS.map((t) => {
-            const on = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={[
-                  "group flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors border",
-                  on
-                    ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-surface border-border/[0.06] text-muted-foreground/70 hover:text-foreground/90 hover:bg-surface-hover",
-                ].join(" ")}
-              >
-                <span className={`size-1.5 rounded-full ${on ? t.dot : "bg-current opacity-40"}`} />
-                {t.label}
-                <span className={[
-                  "tabular-nums rounded-full px-1.5 text-[10px] font-bold",
-                  on ? "bg-primary/15 text-primary" : "bg-surface text-muted-foreground/60",
-                ].join(" ")}>{t.count}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSearch((s) => !s)}
-            className={[
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] border transition-colors",
-              showSearch ? "bg-primary/10 border-primary/30 text-primary"
-                : "bg-surface border-border/[0.08] text-foreground/70 hover:bg-surface-hover",
-            ].join(" ")}
-          >
-            <SlidersHorizontal size={13} /> Filter
-          </button>
-          <button
-            onClick={exportCsv}
-            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover transition-colors"
-          >
-            <Download size={13} /> Export
-          </button>
-        </div>
-      </div>
-
-      {showSearch && (
-        <div className="mb-4 relative max-w-md animate-in">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, brand, category, GTIN…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
-          />
-        </div>
-      )}
-
+      {/* Toast */}
       {toast && (
-        <div className={[
-          "mb-4 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
-          toast.type === "success"
-            ? "bg-success/10 border border-success/20 text-success"
-            : "bg-danger/10 border border-danger/20 text-danger",
-        ].join(" ")}>
-          {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+        <div
+          className={[
+            "mb-4 flex items-center gap-3 px-4 py-3 rounded-lg text-sm",
+            toast.type === "success"
+              ? "bg-success/10 border border-success/20 text-success"
+              : "bg-danger/10 border border-danger/20 text-danger",
+          ].join(" ")}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 size={15} />
+          ) : (
+            <AlertCircle size={15} />
+          )}
           {toast.message}
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
-        {/* Header row */}
-        <div className="grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3 border-b border-border/[0.08] bg-gradient-to-b from-surface to-surface/40">
-          <div className="flex items-center">
-            <Checkbox checked={allChecked} onChange={toggleAll} />
-          </div>
-          {["Product", "Status", "Category", "Price", "Health"].map((h, i) => (
-            <div key={h} className={[
-              "text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/55",
-              i === 3 ? "text-right" : i === 4 ? "text-center" : "",
-            ].join(" ")}>{h}</div>
-          ))}
-        </div>
-
-        {busy && products.length === 0 ? (
-          <div className="p-12 flex items-center justify-center gap-2 text-muted-foreground/60">
-            <Loader2 size={16} className="animate-spin" />
-            <span className="text-sm">Loading catalog…</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-14 text-center">
-            <div className="relative mx-auto mb-5 w-fit">
-              <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--primary)/0.4),transparent_70%)] opacity-50 blur-lg" />
-              <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/50">
-                <Package size={26} strokeWidth={1.5} />
-              </div>
-            </div>
-            <p className="font-serif text-lg font-semibold text-foreground/80">
-              {products.length === 0 ? "No canonical products yet" : "Nothing matches this view"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {products.length === 0
-                ? "Approved link, CSV, and connector ingestions will appear here."
-                : "Try a different tab or clear the search."}
-            </p>
-          </div>
-        ) : (
-          filtered.map((p) => (
-            <ProductRow
-              key={p.id}
-              product={p}
-              health={healthOf.get(p.id) ?? 0}
-              checked={checked.has(p.id)}
-              onToggle={() => toggleOne(p.id)}
-              onClick={() => setSelectedId(p.id)}
-            />
-          ))
-        )}
-      </div>
-
-      {nextCursor && (
-        <div className="mt-5 flex justify-center">
-          <button
-            onClick={() => void loadMore()}
-            disabled={loadingMore}
-            className="px-4 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/80 hover:bg-surface-hover disabled:opacity-40 flex items-center gap-2"
-          >
-            {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
-            {loadingMore ? "Loading…" : "Load more"}
-          </button>
+      {/* Tree load error */}
+      {treeError && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-lg text-sm bg-warning/10 border border-warning/20 text-warning">
+          <AlertCircle size={15} />
+          Category tree unavailable: {treeError}
         </div>
       )}
 
-      {/* Sticky summary footer */}
-      <div className="fixed bottom-0 left-[var(--sidebar-width,256px)] right-0 z-10 border-t border-border/[0.08] bg-background/80 backdrop-blur-md">
-        <div className="px-8 py-3 flex items-center gap-8 text-xs">
-          <FooterStat label="Catalog Health" value={`${counts.avgHealth}%`} tone={counts.avgHealth >= 80 ? "emerald" : counts.avgHealth >= 50 ? "amber" : "rose"} />
-          <FooterStat label="Needs Enrichment" value={counts.needs} tone={counts.needs ? "amber" : "muted"} />
-          <FooterStat label="Uncategorised" value={counts.uncategorised} tone={counts.uncategorised ? "rose" : "muted"} />
-          <FooterStat label="Total SKUs" value={realTotal} tone="default" />
-          {loadingMore && (
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-              <Loader2 size={12} className="animate-spin" /> Loading {products.length} of {realTotal}…
-            </span>
+      {/* Two-column layout */}
+      <div className="flex gap-6 items-start">
+        {/* ── Left rail ────────────────────────────────────────────── */}
+        <aside className="hidden md:block w-56 shrink-0 sticky top-4 self-start max-h-[calc(100vh-8rem)] overflow-y-auto rounded-2xl border border-border/[0.08] bg-card shadow-sm p-3">
+          {treeNodes === null ? (
+            /* Tree loading placeholder */
+            <div className="flex flex-col gap-1.5 py-2">
+              {[100, 80, 90, 70, 85].map((w, i) => (
+                <div
+                  key={i}
+                  className="h-5 rounded-md bg-foreground/[0.05] animate-pulse"
+                  style={{ width: `${w}%` }}
+                />
+              ))}
+            </div>
+          ) : (
+            <CategoryTree
+              nodes={treeNodes}
+              uncategorizedCount={uncategorizedCount}
+              selectedNodeId={selectedNodeId}
+              uncategorizedSelected={uncategorizedSelected}
+              onSelect={handleSelectNode}
+              onSelectUncategorized={handleSelectUncategorized}
+            />
           )}
-          <button
-            onClick={() => void loadAll()}
-            disabled={busy || loadingMore}
-            className="ml-auto flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] bg-surface border border-border/[0.08] text-foreground/75 hover:bg-surface-hover disabled:opacity-40"
-          >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh
-          </button>
+        </aside>
+
+        {/* ── Main area ─────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0">
+          {/* Search bar */}
+          <div className="mb-4 relative">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none"
+            />
+            <input
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search title, brand, GTIN…"
+              className="w-full max-w-md pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40 transition-colors"
+            />
+          </div>
+
+          {/* Breadcrumb — only when a specific category is selected */}
+          {displayPath && (
+            <div className="mb-3 px-0.5">
+              <CategoryBreadcrumb
+                displayPath={displayPath}
+                className="text-xs text-muted-foreground/70"
+              />
+            </div>
+          )}
+          {uncategorizedSelected && (
+            <div className="mb-3 px-0.5">
+              <span className="text-xs font-semibold text-warning">
+                Uncategorized products
+              </span>
+            </div>
+          )}
+
+          {/* Status line */}
+          <div className="mb-3 flex items-center gap-3 text-xs text-muted-foreground/60">
+            {total !== null && (
+              <span className="tabular-nums">
+                {products.length} of {total.toLocaleString()} products
+              </span>
+            )}
+            {busy && (
+              <span className="flex items-center gap-1">
+                <Loader2 size={11} className="animate-spin" /> Loading…
+              </span>
+            )}
+          </div>
+
+          {/* Grid / empty / loading */}
+          {busy && products.length === 0 ? (
+            <ProductGridSkeleton />
+          ) : products.length === 0 ? (
+            <EmptyState
+              searchActive={q.trim().length > 0}
+              uncategorized={uncategorizedSelected}
+            />
+          ) : (
+            <>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {products.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    onClick={() => setSelectedId(p.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Load more */}
+              {nextCursor && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    className="px-5 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/80 hover:bg-surface-hover disabled:opacity-40 flex items-center gap-2 transition-colors"
+                  >
+                    {loadingMore ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : null}
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
+      {/* Product detail modal */}
       {selectedId && (
         <ProductDetailModal
           productId={selectedId}
@@ -409,151 +375,75 @@ function CatalogPageContent() {
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function ProductGridSkeleton() {
   return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onChange(); }}
-      aria-label="Select"
-      className={[
-        "size-4 rounded-[5px] border flex items-center justify-center transition-colors",
-        checked ? "bg-primary border-primary text-background" : "border-border/40 hover:border-foreground/40",
-      ].join(" ")}
-    >
-      {checked && <CheckCircle2 size={11} strokeWidth={3} />}
-    </button>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const s = catalogStatusBadge(status);
-  return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${s.className}`}>
-      {s.label}
-    </span>
-  );
-}
-
-function HealthRing({ value }: { value: number }) {
-  const r = 13;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, value));
-  const tone =
-    pct >= 80 ? "hsl(var(--success))"
-    : pct >= 50 ? "hsl(var(--warning))"
-    : "hsl(var(--danger))";
-  return (
-    <div className="relative size-9">
-      <svg viewBox="0 0 32 32" className="size-full -rotate-90">
-        <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-foreground/[0.07]" />
-        <circle
-          cx="16" cy="16" r={r} fill="none" stroke={tone} strokeWidth="2.5" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c}
-          style={{ transition: "stroke-dashoffset .5s ease" }}
-        />
-      </svg>
-      <span
-        className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums"
-        style={{ color: tone }}
-      >{pct}</span>
+    <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm"
+        >
+          <div className="aspect-square w-full bg-foreground/[0.05] animate-pulse" />
+          <div className="p-3 flex flex-col gap-2">
+            <div className="h-2.5 w-1/3 rounded bg-foreground/[0.05] animate-pulse" />
+            <div className="h-3.5 w-full rounded bg-foreground/[0.05] animate-pulse" />
+            <div className="h-3 w-2/3 rounded bg-foreground/[0.05] animate-pulse" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ProductRow({
-  product, health, checked, onToggle, onClick,
+function EmptyState({
+  searchActive,
+  uncategorized,
 }: {
-  product: ListCatalogProductRow;
-  health: number;
-  checked: boolean;
-  onToggle: () => void;
-  onClick: () => void;
+  searchActive: boolean;
+  uncategorized: boolean;
 }) {
-  const price = getDisplayPrice(product);
-  return (
-    <div
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
-      className={[
-        "grid grid-cols-[36px_minmax(0,2.4fr)_120px_minmax(0,1fr)_110px_72px] gap-4 px-5 py-3.5 items-center cursor-pointer",
-        "border-t border-border/[0.05] hover:bg-surface-hover transition-colors group",
-        checked ? "bg-primary/[0.04]" : "",
-      ].join(" ")}
-    >
-      <div className="flex items-center">
-        <Checkbox checked={checked} onChange={onToggle} />
-      </div>
+  const message = uncategorized
+    ? "No uncategorized products"
+    : searchActive
+    ? "No products match your search"
+    : "No products in this category";
 
-      {/* Product */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="size-10 rounded-lg bg-surface border border-border/[0.06] overflow-hidden flex items-center justify-center shrink-0">
-          {product.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- remote merchant CDN URLs
-            <img src={product.imageUrl} alt="" className="size-full object-cover" loading="lazy"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-          ) : (
-            <Package size={17} className="text-muted-foreground/30" strokeWidth={1.3} />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground/95 truncate group-hover:text-primary transition-colors">
-            {product.title ?? <span className="text-muted-foreground/50 italic">Untitled</span>}
-          </p>
-          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground/45 truncate">
-            {product.brand ? `${product.brand} · ` : ""}{product.gtin ?? product.id.slice(0, 8)}
-          </p>
+  const sub = uncategorized
+    ? "All products have a taxonomy assignment — great work."
+    : searchActive
+    ? "Try adjusting your search term or selecting a different category."
+    : "Products will appear here once they are ingested and approved.";
+
+  return (
+    <div className="py-16 text-center">
+      <div className="relative mx-auto mb-5 w-fit">
+        <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--primary)/0.4),transparent_70%)] opacity-50 blur-lg" />
+        <div className="relative grid size-14 place-items-center rounded-2xl border border-border/[0.1] bg-surface text-muted-foreground/50">
+          <Package size={26} strokeWidth={1.5} />
         </div>
       </div>
-
-      {/* Status */}
-      <div><StatusBadge status={product.status} /></div>
-
-      {/* Category */}
-      <div className="min-w-0 text-sm text-foreground/75 truncate">
-        {product.category ?? <span className="text-muted-foreground/35">—</span>}
-      </div>
-
-      {/* Price */}
-      <div className="text-right text-sm font-bold tabular-nums text-foreground/90">
-        {price?.text ?? <span className="font-normal text-muted-foreground/35">—</span>}
-      </div>
-
-      {/* Health */}
-      <div className="flex justify-center"><HealthRing value={health} /></div>
+      <p className="font-serif text-lg font-semibold text-foreground/80">
+        {message}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
     </div>
   );
 }
 
-function FooterStat({
-  label, value, tone,
-}: {
-  label: string;
-  value: string | number;
-  tone: "emerald" | "amber" | "rose" | "muted" | "default";
-}) {
-  const cls = {
-    emerald: "text-success", amber: "text-warning", rose: "text-danger",
-    muted: "text-muted-foreground/50", default: "text-foreground/90",
-  }[tone];
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50">{label}</span>
-      <span className={`text-sm font-bold tabular-nums ${cls}`}>{value}</span>
-    </div>
-  );
-}
+// ── Page export (Suspense boundary for useSearchParams) ───────────────────────
 
 export default function CatalogPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-24 text-muted-foreground/60">
-        <Loader2 size={16} className="animate-spin" />
-        <span className="text-sm">Loading catalog…</span>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground/60">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Loading catalog…</span>
+        </div>
+      }
+    >
       <CatalogPageContent />
     </Suspense>
   );

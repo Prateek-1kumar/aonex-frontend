@@ -16,6 +16,8 @@ import type { ListCatalogProductRow } from "@/app/(authenticated)/catalog/lib/ca
 import { EnrichReviewDrawer } from "@/app/(authenticated)/catalog/components/EnrichReviewDrawer";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
 import { loadCatalogTitles } from "@/lib/catalog-titles";
+import CategoryBreadcrumb from "@/components/category-breadcrumb";
+import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 const STAGED = new Set(["pending", "generating", "ready"]);
@@ -47,6 +49,8 @@ export default function DraftingRoomPage() {
   // fall back to the real product title from the catalog.
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { resolve: resolvePath } = useCategoryPaths();
 
   const showToast = useCallback((t: Toast) => {
     setToast(t);
@@ -199,8 +203,13 @@ export default function DraftingRoomPage() {
                   <p className="text-sm font-medium text-foreground/90 truncate">
                     {titleOf(d) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
-                    {d.archetype && <span className="uppercase tracking-wider">{d.archetype}</span>}
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
+                    {d.archetype && (
+                      <CategoryBreadcrumb
+                        displayPath={resolvePath(d.archetype)}
+                        className="text-[11px] text-muted-foreground/55"
+                      />
+                    )}
                     {d.status === "ready" && (
                       <>
                         <span>· {d.fieldCount} fields</span>
@@ -209,7 +218,7 @@ export default function DraftingRoomPage() {
                         )}
                       </>
                     )}
-                  </p>
+                  </div>
                 </div>
                 <div><DraftBadge status={d.status} /></div>
                 <div className="flex justify-end">

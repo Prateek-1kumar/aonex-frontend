@@ -69,6 +69,45 @@ export interface ReviewTask {
 // haven't been updated yet — note: the shape is different.
 export type { ListCatalogProductRow as CatalogProduct } from "@/app/(authenticated)/catalog/lib/catalog-types";
 
+// ─── Taxonomy ─────────────────────────────────────────────────────
+
+/** One node in the flat taxonomy tree returned by /api/catalog/taxonomy/tree */
+export interface TaxonomyTreeNode {
+  nodeId: string;
+  parentId: string | null;
+  level: number;
+  displayName: string;
+  /** " › "-separated breadcrumb, e.g. "Fashion › Clothing › Jeans" */
+  displayPath: string;
+  isLeaf: boolean;
+  /** DIRECT product count for this node only — client rolls up descendants */
+  productCount: number;
+}
+
+// ─── Lab taxonomy ─────────────────────────────────────────────────
+
+/** A lightweight taxonomy node returned by /api/lab/taxonomy/search */
+export interface TaxonomyNodeHit {
+  nodeId: string;
+  displayPath: string;
+  isLeaf: boolean;
+}
+
+/** One classifier suggestion for an uncategorized product */
+export interface ClassifierSuggestion {
+  nodeId: string;
+  displayPath: string;
+  score: number;
+}
+
+/** An uncategorized product with classifier suggestions */
+export interface UncategorizedItem {
+  productId: string;
+  title: string;
+  sourceCategory: string;
+  suggestions: ClassifierSuggestion[];
+}
+
 // ─── Phase 6/8/9 — link ingestion pack ────────────────────────────
 
 export interface RecentIngestion {
@@ -256,6 +295,16 @@ export interface ProposalFieldView {
   validationError?: string;
   decision: "pending" | "accept" | "reject" | "edit";
   editedValue?: unknown;
+  /** Grounding strength from PersistedProposalField */
+  grounding?: "grounded" | "weak" | "inferred" | "contradicted" | string;
+  /** 0..1 grounding support score */
+  support?: number;
+  /** Source evidence snippet */
+  evidence?: string;
+  /** True when auto-applied by the worker (already committed) */
+  accepted?: boolean;
+  /** True when eligible for human review */
+  proposable?: boolean;
 }
 
 export interface CandidateAttributeView {
@@ -274,12 +323,17 @@ export interface EnrichmentScore {
   completeness: number;
   /** LLM content-quality score (0..100); present on scoreAfter once enriched. */
   contentQuality?: number;
+  /** Completeness score after ONLY the auto-applied fields (pre-review baseline). */
+  autoApplied?: number;
+  /** Fraction of fields with grounded/strong evidence (0..1). */
+  groundingRate?: number;
 }
 
 export interface EnrichmentProposalView {
   proposalId: string;
   productId: string;
   status: "pending" | "generating" | "ready" | "applied" | "rejected" | "failed";
+  /** Taxonomy node id (hierarchical slug e.g. "fashion/clothing/jeans"), not a legacy archetype. */
   archetype: string | null;
   model: string | null;
   promptVersion: string;
@@ -322,6 +376,7 @@ export interface ProposalListItem {
   productId: string;
   title: string | null;
   status: EnrichmentProposalView["status"];
+  /** Taxonomy node id (hierarchical slug e.g. "fashion/clothing/jeans"), not a legacy archetype. */
   archetype: string | null;
   scoreBefore: EnrichmentScore | null;
   scoreAfter: EnrichmentScore | null;
@@ -565,14 +620,28 @@ export const api = {
       status?: string;
       limit?: number;
       cursor?: string;
+      /** Filter to a specific taxonomy node id */
+      category?: string;
+      /** When true, return only products with no taxonomy assignment */
+      uncategorized?: boolean;
+      /** Full-text search query */
+      q?: string;
     }): Promise<{ products: ListCatalogProductRow[]; nextCursor: string | null; total: number }> {
       const params = new URLSearchParams();
       if (opts?.status) params.set("status", opts.status);
       if (opts?.limit) params.set("limit", String(opts.limit));
       if (opts?.cursor) params.set("cursor", opts.cursor);
+      if (opts?.category) params.set("category", opts.category);
+      if (opts?.uncategorized) params.set("uncategorized", "true");
+      if (opts?.q) params.set("q", opts.q);
       const qs = params.toString() ? `?${params.toString()}` : "";
       return request<{ products: ListCatalogProductRow[]; nextCursor: string | null; total: number }>(
         `/api/catalog/products${qs}`
+      );
+    },
+    taxonomyTree(): Promise<{ nodes: TaxonomyTreeNode[]; uncategorizedCount: number }> {
+      return request<{ nodes: TaxonomyTreeNode[]; uncategorizedCount: number }>(
+        `/api/catalog/taxonomy/tree`
       );
     },
     get(id: string, consistency: "strong" | "eventual" = "strong"): Promise<CatalogProductView> {
@@ -697,6 +766,30 @@ export const api = {
     },
     link(id: string, confirmedProductId: string, fills: Record<string, unknown>): Promise<ApproveResult> {
       return labMutate(`/api/lab/staged/${encodeURIComponent(id)}/link`, { confirmedProductId, fills });
+    },
+    /** Search the taxonomy tree. Backend returns empty for q < 2 chars. */
+    taxonomySearch(q: string): Promise<{ nodes: TaxonomyNodeHit[] }> {
+      return request<{ nodes: TaxonomyNodeHit[] }>(
+        `/api/lab/taxonomy/search?q=${encodeURIComponent(q)}`
+      );
+    },
+    /** Return all products that have no taxonomy assignment, with classifier suggestions. */
+    taxonomyUncategorized(): Promise<{ items: UncategorizedItem[] }> {
+      return request<{ items: UncategorizedItem[] }>(`/api/lab/taxonomy/uncategorized`);
+    },
+    /** Assign a taxonomy node to a product; optionally record the raw source label for training. */
+    categorize(
+      productId: string,
+      nodeId: string,
+      rawLabel?: string
+    ): Promise<{ productId: string; nodeId: string; learned: boolean }> {
+      return request<{ productId: string; nodeId: string; learned: boolean }>(
+        `/api/lab/products/${encodeURIComponent(productId)}/categorize`,
+        {
+          method: "POST",
+          body: JSON.stringify({ nodeId, ...(rawLabel ? { rawLabel } : {}) }),
+        }
+      );
     },
   },
   listRecentIngestions(limit = 20): Promise<{ ingestions: RecentIngestion[] }> {
