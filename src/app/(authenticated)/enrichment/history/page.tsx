@@ -9,6 +9,8 @@ import {
 import { api, type ProposalListItem } from "@/lib/api";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
 import { loadCatalogTitles } from "@/lib/catalog-titles";
+import CategoryBreadcrumb from "@/components/category-breadcrumb";
+import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -29,6 +31,8 @@ export default function HistoryPage() {
   const [toast, setToast] = useState<Toast>(null);
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { resolve: resolvePath } = useCategoryPaths();
 
   const showToast = useCallback((t: Toast) => {
     setToast(t);
@@ -121,7 +125,17 @@ export default function HistoryPage() {
                 <div key={p.proposalId} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-4 py-3.5 items-center hover:bg-surface-hover transition-colors">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground/90 truncate">{titleOf(p) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground/55 uppercase tracking-wider">{p.archetype ?? "generic"} · {p.fieldCount} fields</p>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/55">
+                      {p.archetype ? (
+                        <CategoryBreadcrumb
+                          displayPath={resolvePath(p.archetype)}
+                          className="text-[11px] text-muted-foreground/55"
+                        />
+                      ) : (
+                        <span>generic</span>
+                      )}
+                      <span>· {p.fieldCount} fields</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">
                     <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{before}</span>

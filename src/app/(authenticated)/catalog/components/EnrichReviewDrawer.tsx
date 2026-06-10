@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, Check, XCircle, Pencil, Loader2, Sparkles, AlertCircle, ArrowRight, Wand2,
+  X, Check, XCircle, Pencil, Loader2, Sparkles, AlertCircle, ArrowRight, Wand2, ShieldCheck,
 } from "lucide-react";
 import {
   api,
@@ -14,6 +14,9 @@ import {
   type EnrichCandidateDecision,
 } from "@/lib/api";
 import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
+import GroundingBadge from "@/components/grounding-badge";
+import CategoryBreadcrumb from "@/components/category-breadcrumb";
+import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
 
 interface Props {
   productId: string;
@@ -67,9 +70,22 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
   const [busy, setBusy] = useState<"commit" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { resolve: resolvePath } = useCategoryPaths();
+
+  // ── Partition fields: auto-applied vs reviewable ─────────────────────────
+  const autoAppliedFields = useMemo(
+    () => proposal.fields.filter((f) => f.accepted === true),
+    [proposal.fields]
+  );
+  const reviewableFields = useMemo(
+    () => proposal.fields.filter((f) => f.accepted !== true),
+    [proposal.fields]
+  );
+
+  // Decision state only for reviewable fields
   const [fieldDecs, setFieldDecs] = useState<Record<string, FieldDecisionState>>(() => {
     const init: Record<string, FieldDecisionState> = {};
-    for (const f of proposal.fields) init[f.attributeCode] = { decision: f.valid ? "accept" : "reject" };
+    for (const f of reviewableFields) init[f.attributeCode] = { decision: f.valid ? "accept" : "reject" };
     return init;
   });
   const [candDecs, setCandDecs] = useState<Record<string, "accept" | "reject">>(() => {
@@ -85,15 +101,27 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose, busy]);
 
+  // Group only the reviewable fields
   const grouped = useMemo(
     () =>
-      GROUP_ORDER.map((g) => ({ group: g, fields: proposal.fields.filter((f) => f.group === g) }))
+      GROUP_ORDER.map((g) => ({ group: g, fields: reviewableFields.filter((f) => f.group === g) }))
         .filter((x) => x.fields.length > 0),
-    [proposal.fields]
+    [reviewableFields]
+  );
+
+  // Group auto-applied fields for display
+  const autoAppliedGrouped = useMemo(
+    () =>
+      GROUP_ORDER.map((g) => ({ group: g, fields: autoAppliedFields.filter((f) => f.group === g) }))
+        .filter((x) => x.fields.length > 0),
+    [autoAppliedFields]
   );
 
   const before = proposal.scoreBefore?.completeness ?? 0;
   const after = proposal.scoreAfter?.completeness ?? 0;
+  const groundingRate = proposal.scoreAfter?.groundingRate;
+
+  // acceptedCount counts only reviewable decisions + candidate decisions
   const acceptedCount =
     Object.values(fieldDecs).filter((d) => d.decision !== "reject").length +
     Object.values(candDecs).filter((d) => d === "accept").length;
@@ -104,7 +132,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
   function acceptAll() {
     setFieldDecs(() => {
       const next: Record<string, FieldDecisionState> = {};
-      for (const f of proposal.fields) next[f.attributeCode] = { decision: f.valid ? "accept" : "reject" };
+      for (const f of reviewableFields) next[f.attributeCode] = { decision: f.valid ? "accept" : "reject" };
       return next;
     });
     setCandDecs(() => {
@@ -118,7 +146,8 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
     setBusy("commit");
     setError(null);
     try {
-      const fieldDecisions = proposal.fields
+      // Only map reviewable fields — never include auto-applied ones
+      const fieldDecisions = reviewableFields
         .map((f) => {
           const d = fieldDecs[f.attributeCode] ?? { decision: "reject" as const };
           return d.decision === "edit"
@@ -149,6 +178,9 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
     }
   }
 
+  // Resolve archetype (taxonomy nodeId slug) to a display path
+  const archetypeDisplayPath = proposal.archetype ? resolvePath(proposal.archetype) : null;
+
   if (!mounted) return null;
 
   return createPortal(
@@ -172,13 +204,24 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
             </div>
             <div className="min-w-0">
               <h2 className="font-serif text-lg font-bold text-foreground/95 leading-tight">Review enrichment</h2>
-              <p className="text-[11px] text-muted-foreground/55 truncate">
-                {proposal.archetype ?? "generic"}{proposal.model ? ` · ${proposal.model}` : ""}
-              </p>
+              {/* Archetype as category breadcrumb */}
+              {archetypeDisplayPath ? (
+                <CategoryBreadcrumb
+                  displayPath={archetypeDisplayPath}
+                  className="text-[11px] text-muted-foreground/55 mt-0.5"
+                />
+              ) : (
+                <p className="text-[11px] text-muted-foreground/55">
+                  generic{proposal.model ? ` · ${proposal.model}` : ""}
+                </p>
+              )}
+              {archetypeDisplayPath && proposal.model && (
+                <p className="text-[10px] text-muted-foreground/40">{proposal.model}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <ScoreDelta before={before} after={after} />
+            <ScoreDelta before={before} after={after} groundingRate={groundingRate} />
             <button
               onClick={() => { if (!busy) onClose(); }}
               className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center"
@@ -193,7 +236,8 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
         <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground/60">
-              {proposal.fields.length} field{proposal.fields.length === 1 ? "" : "s"}
+              {reviewableFields.length} field{reviewableFields.length === 1 ? "" : "s"} to review
+              {autoAppliedFields.length > 0 ? ` · ${autoAppliedFields.length} auto-applied` : ""}
               {proposal.candidates.length > 0 ? ` · ${proposal.candidates.length} discovered` : ""}
             </p>
             <button
@@ -204,6 +248,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
             </button>
           </div>
 
+          {/* Reviewable fields grouped by category */}
           {grouped.map(({ group, fields }) => (
             <div key={group}>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">
@@ -221,6 +266,27 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
               </div>
             </div>
           ))}
+
+          {/* Auto-applied section — read-only */}
+          {autoAppliedGrouped.length > 0 && (
+            <div>
+              <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-success/70">
+                <ShieldCheck size={12} /> Auto-applied (grounded)
+              </p>
+              <div className="space-y-2">
+                {autoAppliedGrouped.map(({ group, fields }) => (
+                  <div key={group}>
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">
+                      {GROUP_LABEL[group]}
+                    </p>
+                    {fields.map((f) => (
+                      <AutoAppliedFieldRow key={f.attributeCode} field={f} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {proposal.candidates.length > 0 && (
             <div>
@@ -305,18 +371,96 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
   );
 }
 
-function ScoreDelta({ before, after }: { before: number; after: number }) {
+// ── ScoreDelta ────────────────────────────────────────────────────────────────
+
+function ScoreDelta({
+  before,
+  after,
+  groundingRate,
+}: {
+  before: number;
+  after: number;
+  groundingRate?: number | undefined;
+}) {
   const up = after >= before;
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">
-      <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{Math.round(before)}</span>
-      <ArrowRight size={12} className="text-muted-foreground/40" />
-      <span className={`text-sm font-bold tabular-nums ${up ? "text-success" : "text-foreground/80"}`}>
-        {Math.round(after)}
-      </span>
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">
+        <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{Math.round(before)}</span>
+        <ArrowRight size={12} className="text-muted-foreground/40" />
+        <span className={`text-sm font-bold tabular-nums ${up ? "text-success" : "text-foreground/80"}`}>
+          {Math.round(after)}
+        </span>
+      </div>
+      {groundingRate != null && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
+          <ShieldCheck size={10} />
+          Grounding {Math.round(groundingRate * 100)}%
+        </span>
+      )}
     </div>
   );
 }
+
+// ── AutoAppliedFieldRow ───────────────────────────────────────────────────────
+// Read-only view for fields already committed by the worker.
+
+function AutoAppliedFieldRow({ field }: { field: ProposalFieldView }) {
+  const afterImgs = asImageUrls(field.after);
+  const hasBefore = field.before != null && field.before !== "";
+  const beforeImgs = asImageUrls(field.before);
+
+  return (
+    <div className="rounded-xl border border-success/20 bg-success/[0.03] px-4 py-3 mb-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-foreground/90">{humanize(field.attributeCode)}</span>
+            <ActionBadge action={field.action} />
+            <span className="inline-flex items-center gap-1 rounded border border-success/30 bg-success/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-success">
+              auto-applied
+            </span>
+            {field.grounding && (
+              <GroundingBadge grounding={field.grounding} support={field.support} />
+            )}
+            <span className="text-[10px] tabular-nums text-muted-foreground/45">
+              {Math.round(field.confidence * 100)}%
+            </span>
+          </div>
+
+          <div className="mt-2 space-y-1.5">
+            {afterImgs ? (
+              <ThumbStrip urls={afterImgs} />
+            ) : (
+              <p className="text-sm text-foreground/80 break-words whitespace-pre-wrap line-clamp-3">{renderVal(field.after)}</p>
+            )}
+            {hasBefore && (
+              beforeImgs ? (
+                <p className="text-[11px] text-muted-foreground/40">
+                  Replaced {beforeImgs.length} previous image{beforeImgs.length === 1 ? "" : "s"}
+                </p>
+              ) : (
+                <p className="flex items-baseline gap-1.5 text-[11px] text-muted-foreground/35">
+                  <span className="shrink-0 font-semibold uppercase tracking-wider">was</span>
+                  <span className="line-through line-clamp-2 break-words">{renderVal(field.before)}</span>
+                </p>
+              )
+            )}
+          </div>
+
+          {/* Evidence snippet */}
+          {field.evidence && (
+            <p className="mt-1.5 text-[11px] italic text-muted-foreground/50 line-clamp-2">
+              &ldquo;{field.evidence}&rdquo;
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── FieldRow ──────────────────────────────────────────────────────────────────
 
 function FieldRow({
   field, state, onChange,
@@ -356,6 +500,10 @@ function FieldRow({
             <span className="text-[10px] tabular-nums text-muted-foreground/45">
               {Math.round(field.confidence * 100)}%
             </span>
+            {/* Grounding badge for reviewable fields */}
+            {field.grounding && (
+              <GroundingBadge grounding={field.grounding} support={field.support} />
+            )}
             {!field.valid && (
               <span className="text-[10px] text-warning">⚠ {field.validationError ?? "invalid"}</span>
             )}
@@ -403,6 +551,13 @@ function FieldRow({
 
           {field.reasoning && state.decision !== "edit" && (
             <p className="mt-1.5 text-[11px] italic text-muted-foreground/50 line-clamp-2">{field.reasoning}</p>
+          )}
+
+          {/* Evidence snippet — shown when present and not in edit mode */}
+          {field.evidence && state.decision !== "edit" && (
+            <p className="mt-1 text-[11px] italic text-muted-foreground/45 line-clamp-2">
+              &ldquo;{field.evidence}&rdquo;
+            </p>
           )}
         </div>
 

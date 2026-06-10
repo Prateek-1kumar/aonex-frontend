@@ -26,6 +26,10 @@ export interface ListCatalogProductRow {
   gtin: string | null;
   /** Projected from winning_values.category_path; null when uncategorised. */
   category: string | null;
+  /** Canonical taxonomy assignment (catalog_products.category_node_id). Null when unclassified. */
+  categoryNodeId: string | null;
+  /** Display breadcrumb of the assigned taxonomy node ("Fashion › Clothing › Jeans"). Null when unclassified. */
+  categoryPath: string | null;
   /** Always null for new-schema rows (legacy concept removed). */
   current_version: null;
   /** Always [] for new-schema rows (variants deferred per Phase 7). */
