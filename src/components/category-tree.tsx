@@ -56,7 +56,16 @@ function buildTree(flat: TaxonomyTreeNode[]): { roots: TreeNode[]; totalCount: n
   let totalCount = 0;
   for (const root of roots) totalCount += rollUp(root);
 
-  return { roots, totalCount };
+  // Only surface categories that actually contain products (rolled up). Empty
+  // branches stay hidden and appear automatically as inventory lands under them
+  // — so a client who only sells electronics sees just their tree, not all 151.
+  function prune(list: TreeNode[]): TreeNode[] {
+    return list
+      .filter((n) => n.rolledUpCount > 0)
+      .map((n) => ({ ...n, children: prune(n.children) }));
+  }
+
+  return { roots: prune(roots), totalCount };
 }
 
 // ─── single row ───────────────────────────────────────────────────
@@ -151,14 +160,25 @@ export default function CategoryTree({
   onSelect,
   onSelectUncategorized,
 }: CategoryTreeProps) {
-  // Expand root-level nodes by default (level 0); deeper nodes collapsed
-  const defaultExpanded = useMemo(
-    () => new Set(nodes.filter((n) => n.level === 0).map((n) => n.nodeId)),
-    [nodes]
-  );
-  const [expanded, setExpanded] = useState<Set<string>>(defaultExpanded);
-
   const { roots, totalCount } = useMemo(() => buildTree(nodes), [nodes]);
+
+  // The tree is pruned to non-empty branches, so it's small — expand every
+  // surviving branch by default so the categories with products are visible
+  // without drilling in.
+  const defaultExpanded = useMemo(() => {
+    const ids = new Set<string>();
+    const walk = (list: TreeNode[]) => {
+      for (const n of list) {
+        if (n.children.length > 0) {
+          ids.add(n.nodeId);
+          walk(n.children);
+        }
+      }
+    };
+    walk(roots);
+    return ids;
+  }, [roots]);
+  const [expanded, setExpanded] = useState<Set<string>>(defaultExpanded);
 
   function handleToggle(nodeId: string) {
     setExpanded((prev) => {
