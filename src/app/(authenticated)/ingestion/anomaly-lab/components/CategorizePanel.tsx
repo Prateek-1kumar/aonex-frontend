@@ -79,10 +79,11 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
           </div>
         </div>
         <p className="font-serif text-lg font-semibold text-foreground/80">
-          All clear — every product is categorized
+          All caught up — nothing to categorize
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          New uncategorized products appear here after ingestion.
+          Products auto-categorize on ingest. Anything the classifier isn&apos;t confident
+          about lands here for a quick manual pick.
         </p>
         <button
           onClick={() => void load()}
@@ -96,11 +97,17 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground/70">
-          <span className="font-semibold text-foreground/80">{items.length}</span>{" "}
-          product{items.length === 1 ? "" : "s"} need a taxonomy assignment
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs text-muted-foreground/70">
+          <p>
+            <span className="font-semibold text-foreground/80">{items.length}</span>{" "}
+            product{items.length === 1 ? "" : "s"} need a manual category
+          </p>
+          <p className="mt-0.5 text-muted-foreground/45">
+            Products auto-categorize on ingest — these are the ones the classifier
+            wasn&apos;t confident about.
+          </p>
+        </div>
         <button
           onClick={() => void load()}
           disabled={loading}
