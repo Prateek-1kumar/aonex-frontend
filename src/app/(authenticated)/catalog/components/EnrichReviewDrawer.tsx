@@ -13,7 +13,7 @@ import {
   type EnrichFieldDecision,
   type EnrichCandidateDecision,
 } from "@/lib/api";
-import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
+import { asImageUrls, ThumbStrip, ContentValue } from "@/components/ui/value-display";
 import GroundingBadge from "@/components/grounding-badge";
 import CategoryBreadcrumb from "@/components/category-breadcrumb";
 import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
@@ -119,6 +119,8 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
 
   const before = proposal.scoreBefore?.completeness ?? 0;
   const after = proposal.scoreAfter?.completeness ?? 0;
+  const contentBefore = proposal.scoreBefore?.contentQuality ?? 0;
+  const contentAfter = proposal.scoreAfter?.contentQuality ?? 0;
   const groundingRate = proposal.scoreAfter?.groundingRate;
 
   // acceptedCount counts only reviewable decisions + candidate decisions
@@ -221,7 +223,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <ScoreDelta before={before} after={after} groundingRate={groundingRate} />
+            <ScoreDelta before={before} after={after} contentBefore={contentBefore} contentAfter={contentAfter} groundingRate={groundingRate} />
             <button
               onClick={() => { if (!busy) onClose(); }}
               className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover flex items-center justify-center"
@@ -376,22 +378,38 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
 function ScoreDelta({
   before,
   after,
+  contentBefore,
+  contentAfter,
   groundingRate,
 }: {
   before: number;
   after: number;
+  contentBefore?: number;
+  contentAfter?: number;
   groundingRate?: number | undefined;
 }) {
   const up = after >= before;
+  const contentUp = (contentAfter ?? 0) >= (contentBefore ?? 0);
   return (
     <div className="flex items-center gap-2 flex-wrap justify-end">
-      <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5" title="Spec completeness">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40">Spec</span>
         <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{Math.round(before)}</span>
         <ArrowRight size={12} className="text-muted-foreground/40" />
         <span className={`text-sm font-bold tabular-nums ${up ? "text-success" : "text-foreground/80"}`}>
           {Math.round(after)}
         </span>
       </div>
+      {(contentAfter != null && contentAfter > 0) && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/[0.05] px-2.5 py-1.5" title="Content quality (description / SEO / marketing / AEO)">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-primary/60">Content</span>
+          <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{Math.round(contentBefore ?? 0)}</span>
+          <ArrowRight size={12} className="text-muted-foreground/40" />
+          <span className={`text-sm font-bold tabular-nums ${contentUp ? "text-primary" : "text-foreground/80"}`}>
+            {Math.round(contentAfter)}
+          </span>
+        </div>
+      )}
       {groundingRate != null && (
         <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
           <ShieldCheck size={10} />
@@ -530,6 +548,8 @@ function FieldRow({
               )
             ) : afterImgs ? (
               <ThumbStrip urls={afterImgs} />
+            ) : field.kind === "content" ? (
+              <ContentValue value={field.after} />
             ) : (
               <p className="text-sm text-foreground/90 break-words whitespace-pre-wrap line-clamp-4">{renderVal(field.after)}</p>
             )}
