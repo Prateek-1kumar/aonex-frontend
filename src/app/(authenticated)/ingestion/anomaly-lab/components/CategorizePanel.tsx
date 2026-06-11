@@ -1,20 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-  Tag,
-  Sparkles,
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { CheckCircle2, Loader2, RefreshCw, Tag, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
-import type { UncategorizedItem, TaxonomyNodeHit } from "@/lib/api";
+import type { UncategorizedItem } from "@/lib/api";
 import CategoryBreadcrumb from "@/components/category-breadcrumb";
-import { TaxonomyPicker } from "./TaxonomyPicker";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
+import { CategorizeModal } from "./CategorizeModal";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -23,12 +14,11 @@ interface CategorizePanelProps {
   onToast: (t: Toast) => void;
 }
 
-// ── CategorizePanel ────────────────────────────────────────────────────────────
-
 export function CategorizePanel({ onToast }: CategorizePanelProps) {
   const [items, setItems] = useState<UncategorizedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [activeItem, setActiveItem] = useState<UncategorizedItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,26 +36,28 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
     void load();
   }, [load]);
 
-  async function categorize(item: UncategorizedItem, nodeId: string) {
-    setBusyId(item.productId);
-    try {
-      const result = await api.lab.categorize(item.productId, nodeId, item.sourceCategory);
-      // Optimistic remove
-      setItems((prev) => prev.filter((i) => i.productId !== item.productId));
-      onToast({
-        type: "success",
-        message: result.learned
-          ? `Categorized · learned this label for "${item.sourceCategory}"`
-          : `Categorized · taxonomy node assigned`,
-      });
-    } catch (e) {
-      onToast({ type: "error", message: (e as Error).message });
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const categorize = useCallback(
+    async (item: UncategorizedItem, nodeId: string) => {
+      setBusyId(item.productId);
+      try {
+        const result = await api.lab.categorize(item.productId, nodeId, item.sourceCategory);
+        setItems((prev) => prev.filter((i) => i.productId !== item.productId));
+        setActiveItem(null);
+        onToast({
+          type: "success",
+          message: result.learned
+            ? `Categorized · learned "${item.sourceCategory}" for next time`
+            : "Categorized · taxonomy node assigned",
+        });
+      } catch (e) {
+        onToast({ type: "error", message: (e as Error).message });
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [onToast]
+  );
 
-  // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -75,7 +67,6 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
     );
   }
 
-  // ── Empty state ────────────────────────────────────────────────────────────
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-border/[0.08] bg-card py-24 text-center shadow-sm">
@@ -101,10 +92,8 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
     );
   }
 
-  // ── Product list ───────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-3">
-      {/* Refresh control */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground/70">
           <span className="font-semibold text-foreground/80">{items.length}</span>{" "}
@@ -114,179 +103,78 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
           onClick={() => void load()}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground disabled:opacity-40 transition-colors"
-          aria-label="Refresh uncategorized list"
         >
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
 
-      {/* Cards */}
-      <div className="flex flex-col gap-3">
-        {items.map((item) => (
-          <UncategorizedCard
-            key={item.productId}
-            item={item}
-            busy={busyId === item.productId}
-            onCategorize={(nodeId) => void categorize(item, nodeId)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── UncategorizedCard ─────────────────────────────────────────────────────────
-
-interface UncategorizedCardProps {
-  item: UncategorizedItem;
-  busy: boolean;
-  onCategorize: (nodeId: string) => void;
-}
-
-function UncategorizedCard({ item, busy, onCategorize }: UncategorizedCardProps) {
-  const [pickerSelected, setPickerSelected] = useState<TaxonomyNodeHit | null>(null);
-
-  // The classifier prepends its top pick to its own alternatives, so the same
-  // node can appear twice — dedupe (keeping the highest-scoring first hit) to
-  // keep React keys unique and avoid showing a category chip twice.
-  const suggestions = useMemo(() => {
-    const seen = new Set<string>();
-    return item.suggestions.filter((s) => (seen.has(s.nodeId) ? false : (seen.add(s.nodeId), true)));
-  }, [item.suggestions]);
-
-  function handlePickerSelect(node: TaxonomyNodeHit) {
-    setPickerSelected(node);
-  }
-
-  function confirmPickerSelection() {
-    if (!pickerSelected) return;
-    onCategorize(pickerSelected.nodeId);
-    setPickerSelected(null);
-  }
-
-  return (
-    <div
-      className={[
-        "rounded-2xl border border-border/[0.08] bg-card shadow-sm overflow-hidden transition-opacity",
-        busy ? "opacity-60 pointer-events-none" : "",
-      ].join(" ")}
-    >
-      {/* Card header */}
-      <div className="px-5 py-4 flex items-start gap-3 border-b border-border/[0.05]">
-        <div className="shrink-0 grid size-9 place-items-center rounded-lg border border-border/[0.08] bg-surface text-muted-foreground/40">
-          <Tag size={16} strokeWidth={1.4} />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground/95 leading-snug">
-            {item.title || <span className="italic text-muted-foreground/50">Untitled product</span>}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground/55">
-            source:{" "}
-            <span className="font-medium text-muted-foreground/80">{item.sourceCategory}</span>
-          </p>
-        </div>
-
-        {busy && (
-          <Loader2 size={16} className="animate-spin shrink-0 text-muted-foreground/50 mt-0.5" />
-        )}
-      </div>
-
-      {/* Suggestions */}
-      <div className="px-5 py-4 space-y-3">
-        {suggestions.length > 0 && (
-          <div className="space-y-2">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/55">
-              <Sparkles size={10} className="text-primary/70" />
-              Classifier suggestions
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((s) => {
-                const pct = Math.round(s.score * 100);
-                // Confidence tier drives the chip appearance
-                const isHigh = s.score >= 0.75;
-                const isMid = s.score >= 0.5 && s.score < 0.75;
-
-                return (
-                  <button
-                    key={s.nodeId}
-                    type="button"
-                    onClick={() => onCategorize(s.nodeId)}
-                    disabled={busy}
-                    className={[
-                      "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
-                      "hover:ring-2 hover:ring-ring/30 active:scale-[0.97]",
-                      isHigh
-                        ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
-                        : isMid
-                        ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
-                        : "border-border/[0.15] bg-surface text-foreground/70 hover:bg-surface-hover",
-                    ].join(" ")}
-                    title={`Assign: ${s.displayPath}`}
-                  >
-                    <CategoryBreadcrumb
-                      displayPath={s.displayPath}
-                      className="text-[11px] leading-none"
-                    />
-                    <span
-                      className={[
-                        "shrink-0 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full",
-                        isHigh
-                          ? "bg-success/20 text-success"
-                          : isMid
-                          ? "bg-primary/20 text-primary"
-                          : "bg-surface-hover text-muted-foreground/70",
-                      ].join(" ")}
-                    >
-                      {pct}%
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Constrained typeahead picker */}
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/55">
-            Search taxonomy
-          </p>
-
-          <TaxonomyPicker
-            onSelect={handlePickerSelect}
-            disabled={busy}
-          />
-
-          {/* Confirm button — only enabled when a node is selected from results */}
-          {pickerSelected && (
-            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/20 bg-primary/5">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wide">
-                  Selected
-                </p>
-                <CategoryBreadcrumb
-                  displayPath={pickerSelected.displayPath}
-                  className="text-xs mt-0.5"
-                />
+      {/* Compact rows — dense + scannable. The picker opens in a modal so its
+          results can never be clipped by the row below. */}
+      <div className="rounded-2xl border border-border/[0.08] bg-card shadow-sm overflow-hidden divide-y divide-border/[0.05]">
+        {items.map((item) => {
+          const top = item.suggestions[0];
+          const topPct = top ? Math.round(top.score * 100) : 0;
+          const busy = busyId === item.productId;
+          return (
+            <div
+              key={item.productId}
+              className={[
+                "flex items-center gap-3 px-4 py-3 transition-colors",
+                busy ? "opacity-60 pointer-events-none" : "hover:bg-surface-hover",
+              ].join(" ")}
+            >
+              <div className="shrink-0 grid size-9 place-items-center rounded-lg border border-border/[0.07] bg-surface text-muted-foreground/40">
+                <Tag size={15} strokeWidth={1.4} />
               </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground/95 truncate">
+                  {item.title || <span className="italic text-muted-foreground/50">Untitled product</span>}
+                </p>
+                {item.sourceCategory && (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground/50 truncate">
+                    source: <span className="text-muted-foreground/75">{item.sourceCategory}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* High-confidence top suggestion → one-click apply */}
+              {top && topPct >= 60 && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void categorize(item, top.nodeId)}
+                  title={`Apply: ${top.displayPath}`}
+                  className="hidden lg:flex shrink-0 max-w-[16rem] items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-success/25 bg-success/[0.07] text-success hover:bg-success/15 transition-colors"
+                >
+                  <CategoryBreadcrumb displayPath={top.displayPath} className="text-[11px] leading-none" />
+                  <span className="shrink-0 text-[10px] font-bold tabular-nums">{topPct}%</span>
+                </button>
+              )}
+
+              {/* Open the full picker */}
               <button
                 type="button"
-                onClick={confirmPickerSelection}
                 disabled={busy}
-                className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-b from-primary to-primary/85 text-primary-foreground text-xs font-semibold shadow shadow-primary/20 hover:brightness-110 active:translate-y-px transition-all disabled:opacity-40"
+                onClick={() => setActiveItem(item)}
+                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors"
               >
-                {busy ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={12} />
-                )}
-                Confirm
+                {busy ? <Loader2 size={13} className="animate-spin" /> : "Categorize"}
+                {!busy && <ChevronRight size={13} />}
               </button>
             </div>
-          )}
-        </div>
+          );
+        })}
       </div>
+
+      {activeItem && (
+        <CategorizeModal
+          item={activeItem}
+          busy={busyId === activeItem.productId}
+          onPick={(nodeId) => void categorize(activeItem, nodeId)}
+          onClose={() => setActiveItem(null)}
+        />
+      )}
     </div>
   );
 }
