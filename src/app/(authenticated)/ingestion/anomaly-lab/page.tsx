@@ -87,7 +87,7 @@ function AnomalyLabPageContent() {
     if (idParam) {
       const url = new URL(window.location.href);
       url.searchParams.delete("id");
-      router.replace(url.pathname + url.search);
+      router.replace(url.pathname + url.search, { scroll: false });
     }
   }, [router, idParam]);
 
@@ -98,7 +98,7 @@ function AnomalyLabPageContent() {
       if (idParam === id) {
         const url = new URL(window.location.href);
         url.searchParams.delete("id");
-        router.replace(url.pathname + url.search);
+        router.replace(url.pathname + url.search, { scroll: false });
       }
       showToast({ type: "success", message });
       // Refresh the breakdown chips in the background — non-blocking.
@@ -106,6 +106,20 @@ function AnomalyLabPageContent() {
     },
     [idParam, router]
   );
+
+  // Stable handler for the Categorize panel. An inline arrow here would get a
+  // new identity on every parent render (e.g. each toast), re-firing the panel's
+  // load effect and snapping scroll to the top. References only stable setters.
+  const handleCategorizeToast = useCallback((t: Toast) => {
+    setToast(t);
+    if (t !== null) setTimeout(() => setToast(null), 3500);
+    if (t?.type === "success") {
+      api.lab
+        .taxonomyUncategorized()
+        .then(({ items }) => setUncategorizedCount(items.length))
+        .catch(() => {});
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -271,18 +285,7 @@ function AnomalyLabPageContent() {
 
       {/* ── Categorize tab ───────────────────────────────────────────────────── */}
       {activeTab === "categorize" && (
-        <CategorizePanel
-          onToast={(t) => {
-            setToast(t);
-            if (t !== null) setTimeout(() => setToast(null), 3500);
-            // Refresh uncategorized badge count after a successful categorization
-            if (t?.type === "success") {
-              api.lab.taxonomyUncategorized()
-                .then(({ items }) => setUncategorizedCount(items.length))
-                .catch(() => {});
-            }
-          }}
-        />
+        <CategorizePanel onToast={handleCategorizeToast} />
       )}
 
       {/* Review modal */}
