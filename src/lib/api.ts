@@ -286,6 +286,11 @@ export type EnrichGroup =
 export interface ProposalFieldView {
   attributeCode: string;
   group: EnrichGroup;
+  /** "spec" = extracted structured attribute; "content" = synthesized
+   *  description/SEO/marketing/AEO copy (review-gated, rendered natively). */
+  kind?: "spec" | "content";
+  /** Content shape ("text"/"string_list"/"qa_list"/"pros_cons"). */
+  contentType?: string;
   before: unknown | null;
   after: unknown;
   confidence: number;

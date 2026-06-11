@@ -15,7 +15,7 @@ import {
   type EnrichFieldDecision,
 } from "@/lib/api";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
-import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
+import { asImageUrls, ThumbStrip, ContentValue } from "@/components/ui/value-display";
 import { loadCatalogTitles } from "@/lib/catalog-titles";
 import CategoryBreadcrumb from "@/components/category-breadcrumb";
 import GroundingBadge from "@/components/grounding-badge";
@@ -304,6 +304,11 @@ function ReviewDetail({
                   <div className="mt-2 space-y-1.5">
                     {afterImgs ? (
                       <ThumbStrip urls={afterImgs} />
+                    ) : f.kind === "content" ? (
+                      <div className="flex items-start gap-2">
+                        <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
+                        <div className="min-w-0 flex-1"><ContentValue value={afterVal} /></div>
+                      </div>
                     ) : (
                       <p className="flex items-start gap-2 text-sm text-primary/90 break-words whitespace-pre-wrap line-clamp-4">
                         <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
