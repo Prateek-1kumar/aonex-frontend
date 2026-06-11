@@ -58,7 +58,9 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
     [onToast]
   );
 
-  if (loading) {
+  // Only the INITIAL load blanks the panel. A refresh keeps the list mounted so
+  // the page height (and scroll position) never collapses underneath the user.
+  if (loading && items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <Loader2 size={26} className="animate-spin text-muted-foreground/50" />
@@ -104,7 +106,7 @@ export function CategorizePanel({ onToast }: CategorizePanelProps) {
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border/[0.08] text-xs text-foreground/70 hover:bg-surface-hover hover:text-foreground disabled:opacity-40 transition-colors"
         >
-          <RefreshCw size={12} /> Refresh
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
         </button>
       </div>
 
