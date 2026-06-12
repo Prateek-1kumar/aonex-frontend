@@ -3,26 +3,22 @@
 import { useEffect, useCallback, useMemo, useState, Suspense } from "react";
 import {
   CheckCircle2, AlertCircle, Loader2, RefreshCw, Search, Package, ChevronRight,
-  FlaskConical, AlertTriangle, Tag,
+  FlaskConical, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatPrice, formatRelativeTime } from "@/lib/format";
 import type { QueueItem, QueueStats } from "./lib/lab-types";
 import { QueueStatsHeader } from "./components/QueueStatsHeader";
 import { PushToCatalogModal } from "./components/PushToCatalogModal";
-import { CategorizePanel } from "./components/CategorizePanel";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Toast = { type: "success" | "error"; message: string } | null;
-type LabTab = "queue" | "categorize";
 
 function AnomalyLabPageContent() {
   const searchParams = useSearchParams();
   const idParam = searchParams.get("id");
   const router = useRouter();
-
-  const [activeTab, setActiveTab] = useState<LabTab>("queue");
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [stats, setStats] = useState<QueueStats | null>(null);
@@ -30,8 +26,6 @@ function AnomalyLabPageContent() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<Toast>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Uncategorized count shown in the Categorize tab badge — fetched lazily
-  const [uncategorizedCount, setUncategorizedCount] = useState<number | null>(null);
 
   function showToast(t: Toast) {
     setToast(t);
@@ -70,13 +64,6 @@ function AnomalyLabPageContent() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Fetch uncategorized count once on mount so the tab badge is populated.
-  useEffect(() => {
-    api.lab.taxonomyUncategorized()
-      .then(({ items }) => setUncategorizedCount(items.length))
-      .catch(() => {});
-  }, []);
-
   // Deep-link support: /ingestion/anomaly-lab?id=<stagedProductId> opens that SKU.
   useEffect(() => {
     if (idParam) setSelectedId(idParam);
@@ -107,20 +94,6 @@ function AnomalyLabPageContent() {
     [idParam, router]
   );
 
-  // Stable handler for the Categorize panel. An inline arrow here would get a
-  // new identity on every parent render (e.g. each toast), re-firing the panel's
-  // load effect and snapping scroll to the top. References only stable setters.
-  const handleCategorizeToast = useCallback((t: Toast) => {
-    setToast(t);
-    if (t !== null) setTimeout(() => setToast(null), 3500);
-    if (t?.type === "success") {
-      api.lab
-        .taxonomyUncategorized()
-        .then(({ items }) => setUncategorizedCount(items.length))
-        .catch(() => {});
-    }
-  }, []);
-
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return queue;
@@ -150,70 +123,24 @@ function AnomalyLabPageContent() {
         icon={<FlaskConical size={22} strokeWidth={1.6} />}
         eyebrow="Ingestion"
         title="Anomaly Lab"
-        description="Inspect staged products that need a human check, complete what's missing, then push them to the catalog or assign taxonomy categories."
+        description="Inspect staged products that need a human check, complete what's missing, then push them to the catalog. Categories are assigned automatically at ingestion."
         actions={
-          activeTab === "queue" ? (
-            <button
-              onClick={() => void load()}
-              disabled={loading}
-              className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center disabled:opacity-40 transition-colors"
-              aria-label="Refresh queue"
-            >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-            </button>
-          ) : null
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="size-9 rounded-lg bg-surface border border-border/[0.08] text-foreground/70 hover:bg-surface-hover hover:text-foreground flex items-center justify-center disabled:opacity-40 transition-colors"
+            aria-label="Refresh queue"
+          >
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          </button>
         }
       >
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard icon={<Package size={16} />} label="Awaiting" value={kpis.awaiting} tone="primary" />
           <StatCard icon={<CheckCircle2 size={16} />} label="Ready" value={kpis.ready} tone="success" />
           <StatCard icon={<AlertTriangle size={16} />} label="Needs Info" value={kpis.needsInfo} tone="warning" />
-          <StatCard
-            icon={<Tag size={16} />}
-            label="Uncategorized"
-            value={uncategorizedCount ?? "—"}
-            tone={uncategorizedCount && uncategorizedCount > 0 ? "warning" : "muted"}
-          />
         </div>
       </PageHero>
-
-      {/* Tab toggle */}
-      <div className="flex items-center gap-1 rounded-xl border border-border/[0.08] bg-card p-1 w-fit shadow-sm">
-        <button
-          onClick={() => setActiveTab("queue")}
-          className={[
-            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all",
-            activeTab === "queue"
-              ? "bg-surface shadow-sm text-foreground border border-border/[0.08]"
-              : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
-          ].join(" ")}
-        >
-          <Package size={14} />
-          Review Queue
-          {kpis.awaiting > 0 && (
-            <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-bold w-4 h-4 tabular-nums">
-              {kpis.awaiting > 99 ? "99+" : kpis.awaiting}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("categorize")}
-          className={[
-            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all",
-            activeTab === "categorize"
-              ? "bg-surface shadow-sm text-foreground border border-border/[0.08]"
-              : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
-          ].join(" ")}
-        >
-          <Tag size={14} />
-          Categorize
-          {uncategorizedCount !== null && uncategorizedCount > 0 && (
-            <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-warning/15 text-warning text-[10px] font-bold w-4 h-4 tabular-nums">
-              {uncategorizedCount > 99 ? "99+" : uncategorizedCount}
-            </span>
-          )}
-        </button>
-      </div>
 
       {/* Toast */}
       {toast && (
@@ -226,9 +153,8 @@ function AnomalyLabPageContent() {
         </div>
       )}
 
-      {/* ── Review Queue tab ────────────────────────────────────────────────── */}
-      {activeTab === "queue" && (
-        <>
+      {/* ── Review Queue ────────────────────────────────────────────────────── */}
+      <>
           {/* Summary */}
           <QueueStatsHeader stats={stats} count={stats?.total ?? queue.length} />
 
@@ -280,13 +206,7 @@ function AnomalyLabPageContent() {
               ))}
             </div>
           )}
-        </>
-      )}
-
-      {/* ── Categorize tab ───────────────────────────────────────────────────── */}
-      {activeTab === "categorize" && (
-        <CategorizePanel onToast={handleCategorizeToast} />
-      )}
+      </>
 
       {/* Review modal */}
       {selectedId && selectedItem && (
