@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Gauge, Database, LayoutGrid, Sparkles, BarChart3,
-  Zap, Terminal, Lock, Circle, LogOut, Loader2,
+  Zap, Terminal, Lock, Circle, LogOut, Loader2, ShieldCheck,
 } from "lucide-react";
 import { api, getLocalProfile, type SystemHealth, type UserProfile } from "@/lib/api";
 import ThemeToggle from "@/components/theme-toggle";
@@ -15,6 +15,7 @@ const NAV = [
   { label: "Ingestion",      href: "/ingestion",      icon: Database },
   { label: "Catalog",        href: "/catalog",        icon: LayoutGrid },
   { label: "Enrichment",     href: "/enrichment",     icon: Sparkles,   lockKey: "enrichment" },
+  { label: "Quality",        href: "/enrichment/quality", icon: ShieldCheck },
   { label: "Analytics",      href: "/analytics",      icon: BarChart3,  lockKey: "analytics" },
   { label: "Optimisation",   href: "/optimisation",   icon: Zap,        lockKey: "optimisation" },
   { label: "Command Centre", href: "/command-centre", icon: Terminal,   lockKey: "command-centre" },

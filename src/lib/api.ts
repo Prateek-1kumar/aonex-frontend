@@ -472,6 +472,39 @@ async function labMutate(path: string, payload: unknown): Promise<ApproveResult>
   throw new Error((body as any).error?.message ?? `HTTP ${res.status}`);
 }
 
+/** Catalog Quality Report — measured eval headline + live workspace aggregates. */
+export interface CatalogQualityReport {
+  categorization: { precision: number; recall: number; top1: number } | null;
+  regression: { count: number; sinceLabel: string | null } | null;
+  groundingRate: number | null;
+  completenessLift: number | null;
+  goldAttrAccuracy: number | null;
+  model: string | null;
+  asOf: string | null;
+  catalog: {
+    totalProducts: number;
+    enrichedProducts: number;
+    avgCompleteness: number | null;
+    avgGrounding: number | null;
+    avgContentQuality: number | null;
+    pendingReview: number;
+  };
+}
+
+/** Per-SKU quality breakdown from the product's latest enrichment proposal. */
+export interface ProductQualityMetrics {
+  enriched: boolean;
+  proposalId?: string;
+  status?: string;
+  completeness?: number | null;
+  contentQuality?: number | null;
+  groundingRate?: number | null;
+  provenanceBreakdown?: { grounded: number; weak: number; inferred: number; unverified: number; contradicted: number };
+  attrsFilled?: number;
+  attrsTotal?: number;
+  updatedAt?: string;
+}
+
 export const api = {
   login(email: string, password: string) {
     return fetch("/api/auth/login", {
@@ -745,6 +778,18 @@ export const api = {
       if (opts?.reviewed !== undefined) params.set("reviewed", String(opts.reviewed));
       const qs = params.toString() ? `?${params.toString()}` : "";
       return request<{ proposals: ProposalListItem[] }>(`/api/catalog/enrichment/proposals${qs}`);
+    },
+  },
+
+  quality: {
+    /** Catalog-level report: golden-set eval headline + regression + live aggregates. */
+    catalog(opts?: { category?: string }): Promise<CatalogQualityReport> {
+      const qs = opts?.category ? `?category=${encodeURIComponent(opts.category)}` : "";
+      return request<CatalogQualityReport>(`/api/catalog/quality${qs}`);
+    },
+    /** Per-product quality breakdown (completeness/grounding/provenance). */
+    product(id: string): Promise<ProductQualityMetrics> {
+      return request<ProductQualityMetrics>(`/api/catalog/products/${encodeURIComponent(id)}/quality`);
     },
   },
 
