@@ -46,6 +46,26 @@ const GROUP_LABEL: Record<EnrichGroup, string> = {
 const GROUP_ORDER: EnrichGroup[] = [
   "core", "descriptive", "occasion", "care", "marketing", "seo", "aeo", "category",
 ];
+const OTHER_GROUP = "__other__";
+
+/** Display label for a group key — falls back to "Attributes" for the catch-all
+ *  and any group not in GROUP_LABEL (so nothing renders blank). */
+function groupLabelOf(group: string): string {
+  return (GROUP_LABEL as Record<string, string>)[group] ?? "Attributes";
+}
+
+/** Bucket fields by GROUP_ORDER, then sweep any field with a null/unknown group
+ *  into a trailing "Attributes" bucket so it is NEVER dropped from the UI. */
+function groupFields(fields: ProposalFieldView[]): { group: string; fields: ProposalFieldView[] }[] {
+  const known = new Set<string>(GROUP_ORDER);
+  const out: { group: string; fields: ProposalFieldView[] }[] = GROUP_ORDER.map((g) => ({
+    group: g as string,
+    fields: fields.filter((f) => f.group === g),
+  }));
+  const leftovers = fields.filter((f) => !f.group || !known.has(f.group));
+  if (leftovers.length > 0) out.push({ group: OTHER_GROUP, fields: leftovers });
+  return out.filter((x) => x.fields.length > 0);
+}
 
 const ACRONYMS = new Set(["gtin", "mpn", "sku", "seo", "aeo", "geo", "faq", "url", "id"]);
 function humanize(code: string): string {
@@ -109,21 +129,11 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose, busy]);
 
-  // Group only the reviewable fields
-  const grouped = useMemo(
-    () =>
-      GROUP_ORDER.map((g) => ({ group: g, fields: reviewableFields.filter((f) => f.group === g) }))
-        .filter((x) => x.fields.length > 0),
-    [reviewableFields]
-  );
-
-  // Group auto-applied fields for display
-  const autoAppliedGrouped = useMemo(
-    () =>
-      GROUP_ORDER.map((g) => ({ group: g, fields: autoAppliedFields.filter((f) => f.group === g) }))
-        .filter((x) => x.fields.length > 0),
-    [autoAppliedFields]
-  );
+  // Group fields by GROUP_ORDER, with a catch-all "Attributes" bucket for fields
+  // whose group is null/unknown — most spec attributes have no enrichment_group,
+  // so without this they'd be silently dropped from the drawer entirely.
+  const grouped = useMemo(() => groupFields(reviewableFields), [reviewableFields]);
+  const autoAppliedGrouped = useMemo(() => groupFields(autoAppliedFields), [autoAppliedFields]);
 
   const before = proposal.scoreBefore?.completeness ?? 0;
   const after = proposal.scoreAfter?.completeness ?? 0;
@@ -262,7 +272,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
           {grouped.map(({ group, fields }) => (
             <div key={group}>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">
-                {GROUP_LABEL[group]}
+                {groupLabelOf(group)}
               </p>
               <div className="space-y-2">
                 {fields.map((f) => (
@@ -287,7 +297,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
                 {autoAppliedGrouped.map(({ group, fields }) => (
                   <div key={group}>
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">
-                      {GROUP_LABEL[group]}
+                      {groupLabelOf(group)}
                     </p>
                     {fields.map((f) => (
                       <AutoAppliedFieldRow key={f.attributeCode} field={f} />
