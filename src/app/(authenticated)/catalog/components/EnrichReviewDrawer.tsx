@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X, Check, XCircle, Pencil, Loader2, Sparkles, AlertCircle, ArrowRight, Wand2, ShieldCheck,
+  ChevronDown, ChevronUp, ShieldX,
 } from "lucide-react";
 import {
   api,
@@ -14,7 +15,7 @@ import {
   type EnrichCandidateDecision,
 } from "@/lib/api";
 import { asImageUrls, ThumbStrip, ContentValue } from "@/components/ui/value-display";
-import GroundingBadge from "@/components/grounding-badge";
+import GroundingBadge, { groundingTone } from "@/components/grounding-badge";
 import CategoryBreadcrumb from "@/components/category-breadcrumb";
 import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
 
@@ -45,6 +46,26 @@ const GROUP_LABEL: Record<EnrichGroup, string> = {
 const GROUP_ORDER: EnrichGroup[] = [
   "core", "descriptive", "occasion", "care", "marketing", "seo", "aeo", "category",
 ];
+const OTHER_GROUP = "__other__";
+
+/** Display label for a group key — falls back to "Attributes" for the catch-all
+ *  and any group not in GROUP_LABEL (so nothing renders blank). */
+function groupLabelOf(group: string): string {
+  return (GROUP_LABEL as Record<string, string>)[group] ?? "Attributes";
+}
+
+/** Bucket fields by GROUP_ORDER, then sweep any field with a null/unknown group
+ *  into a trailing "Attributes" bucket so it is NEVER dropped from the UI. */
+function groupFields(fields: ProposalFieldView[]): { group: string; fields: ProposalFieldView[] }[] {
+  const known = new Set<string>(GROUP_ORDER);
+  const out: { group: string; fields: ProposalFieldView[] }[] = GROUP_ORDER.map((g) => ({
+    group: g as string,
+    fields: fields.filter((f) => f.group === g),
+  }));
+  const leftovers = fields.filter((f) => !f.group || !known.has(f.group));
+  if (leftovers.length > 0) out.push({ group: OTHER_GROUP, fields: leftovers });
+  return out.filter((x) => x.fields.length > 0);
+}
 
 const ACRONYMS = new Set(["gtin", "mpn", "sku", "seo", "aeo", "geo", "faq", "url", "id"]);
 function humanize(code: string): string {
@@ -72,13 +93,20 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
 
   const { resolve: resolvePath } = useCategoryPaths();
 
-  // ── Partition fields: auto-applied vs reviewable ─────────────────────────
+  // ── Partition fields: auto-applied · reviewable · speculative ────────────
+  // Speculative = not accepted AND explicitly not proposable (unverified
+  // fabrications / contradictions the engine suppressed). Shown read-only for
+  // transparency, never as accept-by-default in the review queue.
   const autoAppliedFields = useMemo(
     () => proposal.fields.filter((f) => f.accepted === true),
     [proposal.fields]
   );
   const reviewableFields = useMemo(
-    () => proposal.fields.filter((f) => f.accepted !== true),
+    () => proposal.fields.filter((f) => f.accepted !== true && f.proposable !== false),
+    [proposal.fields]
+  );
+  const speculativeFields = useMemo(
+    () => proposal.fields.filter((f) => f.accepted !== true && f.proposable === false),
     [proposal.fields]
   );
 
@@ -101,21 +129,11 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose, busy]);
 
-  // Group only the reviewable fields
-  const grouped = useMemo(
-    () =>
-      GROUP_ORDER.map((g) => ({ group: g, fields: reviewableFields.filter((f) => f.group === g) }))
-        .filter((x) => x.fields.length > 0),
-    [reviewableFields]
-  );
-
-  // Group auto-applied fields for display
-  const autoAppliedGrouped = useMemo(
-    () =>
-      GROUP_ORDER.map((g) => ({ group: g, fields: autoAppliedFields.filter((f) => f.group === g) }))
-        .filter((x) => x.fields.length > 0),
-    [autoAppliedFields]
-  );
+  // Group fields by GROUP_ORDER, with a catch-all "Attributes" bucket for fields
+  // whose group is null/unknown — most spec attributes have no enrichment_group,
+  // so without this they'd be silently dropped from the drawer entirely.
+  const grouped = useMemo(() => groupFields(reviewableFields), [reviewableFields]);
+  const autoAppliedGrouped = useMemo(() => groupFields(autoAppliedFields), [autoAppliedFields]);
 
   const before = proposal.scoreBefore?.completeness ?? 0;
   const after = proposal.scoreAfter?.completeness ?? 0;
@@ -254,7 +272,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
           {grouped.map(({ group, fields }) => (
             <div key={group}>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">
-                {GROUP_LABEL[group]}
+                {groupLabelOf(group)}
               </p>
               <div className="space-y-2">
                 {fields.map((f) => (
@@ -279,7 +297,7 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
                 {autoAppliedGrouped.map(({ group, fields }) => (
                   <div key={group}>
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">
-                      {GROUP_LABEL[group]}
+                      {groupLabelOf(group)}
                     </p>
                     {fields.map((f) => (
                       <AutoAppliedFieldRow key={f.attributeCode} field={f} />
@@ -288,6 +306,32 @@ export function EnrichReviewDrawer({ productId, proposal, onClose, onCommit, com
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Speculative section — suppressed (unverified / contradicted): shown
+              read-only for transparency, never proposed. Collapsed by default. */}
+          {speculativeFields.length > 0 && (
+            <details className="group rounded-xl border border-danger/15 bg-danger/[0.02] px-4 py-2.5">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-danger/70">
+                <ShieldX size={12} /> Speculative — not proposed ({speculativeFields.length})
+                <ChevronDown size={12} className="ml-auto transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-1.5 text-[11px] text-muted-foreground/55">
+                Values the engine could not anchor in the source (or that conflicted with another field). Suppressed from auto-apply and review; listed only so nothing is hidden.
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {speculativeFields.map((f) => (
+                  <div key={f.attributeCode} className={`rounded-lg border border-l-2 border-border/[0.06] bg-surface/60 px-3 py-2 ${groundingTone(f.grounding ?? "unverified")}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold text-foreground/80">{humanize(f.attributeCode)}</span>
+                      {f.grounding && <GroundingBadge grounding={f.grounding} support={f.support} />}
+                    </div>
+                    <p className="mt-1 text-sm text-foreground/70 break-words line-clamp-2">{renderVal(f.after)}</p>
+                    <FieldEvidence field={f} />
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
 
           {proposal.candidates.length > 0 && (
@@ -420,6 +464,50 @@ function ScoreDelta({
   );
 }
 
+// ── FieldEvidence ─────────────────────────────────────────────────────────────
+// Expandable "why" disclosure: a consistency-conflict note (always visible), plus
+// a toggle revealing the model reasoning, the cited source span, and the numeric
+// grounding/support/confidence — the provenance a reviewer needs to trust a value.
+
+function FieldEvidence({ field }: { field: ProposalFieldView }) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = Boolean(field.evidence || field.reasoning);
+  if (!field.consistencyNote && !hasDetail) return null;
+
+  return (
+    <div className="mt-1.5">
+      {field.consistencyNote && (
+        <p className="flex items-start gap-1 text-[11px] font-medium text-danger/80">
+          <ShieldX size={11} className="mt-0.5 shrink-0" /> Cross-field conflict: {field.consistencyNote}
+        </p>
+      )}
+      {hasDetail && (
+        <>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 hover:text-foreground/70"
+          >
+            {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />} {open ? "Hide evidence" : "Why this value?"}
+          </button>
+          {open && (
+            <div className="mt-1 space-y-1 rounded-lg border border-border/[0.07] bg-card/60 px-2.5 py-2">
+              {field.reasoning && <p className="text-[11px] italic text-muted-foreground/70">{field.reasoning}</p>}
+              {field.evidence && (
+                <p className="text-[11px] italic text-muted-foreground/60">Source: &ldquo;{field.evidence}&rdquo;</p>
+              )}
+              <p className="text-[10px] tabular-nums text-muted-foreground/45">
+                grounding <span className="font-semibold">{field.grounding ?? "—"}</span>
+                {field.support != null ? ` · support ${Math.round(field.support * 100)}%` : ""}
+                {` · confidence ${Math.round(field.confidence * 100)}%`}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── AutoAppliedFieldRow ───────────────────────────────────────────────────────
 // Read-only view for fields already committed by the worker.
 
@@ -429,7 +517,7 @@ function AutoAppliedFieldRow({ field }: { field: ProposalFieldView }) {
   const beforeImgs = asImageUrls(field.before);
 
   return (
-    <div className="rounded-xl border border-success/20 bg-success/[0.03] px-4 py-3 mb-2">
+    <div className={`rounded-xl border border-l-2 border-success/20 bg-success/[0.03] px-4 py-3 mb-2 ${groundingTone(field.grounding ?? "grounded")}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -466,12 +554,7 @@ function AutoAppliedFieldRow({ field }: { field: ProposalFieldView }) {
             )}
           </div>
 
-          {/* Evidence snippet */}
-          {field.evidence && (
-            <p className="mt-1.5 text-[11px] italic text-muted-foreground/50 line-clamp-2">
-              &ldquo;{field.evidence}&rdquo;
-            </p>
-          )}
+          <FieldEvidence field={field} />
         </div>
       </div>
     </div>
@@ -502,7 +585,8 @@ function FieldRow({
   return (
     <div
       className={[
-        "rounded-xl border px-4 py-3 transition-colors",
+        "rounded-xl border border-l-2 px-4 py-3 transition-colors",
+        groundingTone(field.grounding ?? "inferred"),
         !field.valid
           ? "border-warning/40 bg-warning/[0.04]"
           : accepted
@@ -569,16 +653,7 @@ function FieldRow({
             )}
           </div>
 
-          {field.reasoning && state.decision !== "edit" && (
-            <p className="mt-1.5 text-[11px] italic text-muted-foreground/50 line-clamp-2">{field.reasoning}</p>
-          )}
-
-          {/* Evidence snippet — shown when present and not in edit mode */}
-          {field.evidence && state.decision !== "edit" && (
-            <p className="mt-1 text-[11px] italic text-muted-foreground/45 line-clamp-2">
-              &ldquo;{field.evidence}&rdquo;
-            </p>
-          )}
+          {state.decision !== "edit" && <FieldEvidence field={field} />}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
