@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   Suspense,
@@ -15,15 +16,18 @@ import {
   Search,
   Package,
   Boxes,
+  Anchor,
+  TrendingUp,
+  ClipboardCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { TaxonomyTreeNode } from "@/lib/api";
+import type { TaxonomyTreeNode, CatalogQualityReport } from "@/lib/api";
 import type { ListCatalogProductRow } from "./lib/catalog-types";
 import { ProductDetailModal } from "./components/ProductDetailModal";
-import ProductCard from "./components/ProductCard";
+import { CatalogTable, type SortKey, type SortState } from "./components/CatalogTable";
 import CategoryTree from "@/components/category-tree";
 import CategoryBreadcrumb from "@/components/category-breadcrumb";
-import { PageHero } from "@/components/ui/page-chrome";
+import { PageHero, StatCard } from "@/components/ui/page-chrome";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -117,6 +121,45 @@ function CatalogPageContent() {
   const [total, setTotal] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // ── Sort (client-side over the loaded page) ──────────────────────────────────
+  const [sort, setSort] = useState<SortState | null>(null);
+  function onSort(k: SortKey) {
+    setSort((prev) =>
+      prev?.key === k
+        ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key: k, dir: k === "completeness" ? "asc" : "desc" } // completeness defaults worst-first
+    );
+  }
+  const sortedProducts = useMemo(() => {
+    if (!sort) return products;
+    const val = (p: ListCatalogProductRow): number | string => {
+      switch (sort.key) {
+        case "completeness": return p.completenessScore ?? -1;
+        case "content": return p.contentQualityScore ?? -1;
+        case "grounding": return p.groundingRate ?? -1;
+        case "attrs": return p.attrsTotal ? (p.attrsFilled ?? 0) / p.attrsTotal : -1;
+        case "title": return (p.title ?? "").toLowerCase();
+        case "status": return p.status;
+      }
+    };
+    return [...products].sort((a, b) => {
+      const av = val(a);
+      const bv = val(b);
+      if (av < bv) return sort.dir === "asc" ? -1 : 1;
+      if (av > bv) return sort.dir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [products, sort]);
+
+  // ── Aggregate quality strip (scoped to the active category) ──────────────────
+  const [quality, setQuality] = useState<CatalogQualityReport | null>(null);
+  useEffect(() => {
+    api.quality
+      .catalog(selectedNodeId ? { category: selectedNodeId } : {})
+      .then(setQuality)
+      .catch(() => setQuality(null));
+  }, [selectedNodeId, uncategorizedSelected]);
 
   // Stable filter signature — if this changes, reset and re-fetch
   const filterKey = `${selectedNodeId ?? ""}|${uncategorizedSelected}|${q.trim()}`;
@@ -306,6 +349,37 @@ function CatalogPageContent() {
             </div>
           )}
 
+          {/* Aggregate quality strip — the catalog as a credibility view. */}
+          {quality && (
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard
+                icon={<Boxes size={15} />}
+                label="Enriched"
+                value={`${quality.catalog.enrichedProducts}`}
+                hint={`of ${quality.catalog.totalProducts}`}
+              />
+              <StatCard
+                icon={<TrendingUp size={15} />}
+                tone="success"
+                label="Avg completeness"
+                value={quality.catalog.avgCompleteness == null ? "—" : Math.round(quality.catalog.avgCompleteness)}
+                hint="/ 100"
+              />
+              <StatCard
+                icon={<Anchor size={15} />}
+                tone="success"
+                label="Avg grounding"
+                value={quality.catalog.avgGrounding == null ? "—" : `${Math.round(quality.catalog.avgGrounding * 100)}%`}
+              />
+              <StatCard
+                icon={<ClipboardCheck size={15} />}
+                tone={quality.catalog.pendingReview > 0 ? "warning" : "muted"}
+                label="Pending review"
+                value={quality.catalog.pendingReview}
+              />
+            </div>
+          )}
+
           {/* Status line */}
           <div className="mb-3 flex items-center gap-3 text-xs text-muted-foreground/60">
             {total !== null && (
@@ -320,9 +394,9 @@ function CatalogPageContent() {
             )}
           </div>
 
-          {/* Grid / empty / loading */}
+          {/* Table / empty / loading */}
           {busy && products.length === 0 ? (
-            <ProductGridSkeleton />
+            <TableSkeleton />
           ) : products.length === 0 ? (
             <EmptyState
               searchActive={q.trim().length > 0}
@@ -330,15 +404,12 @@ function CatalogPageContent() {
             />
           ) : (
             <>
-              <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {products.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onClick={() => setSelectedId(p.id)}
-                  />
-                ))}
-              </div>
+              <CatalogTable
+                products={sortedProducts}
+                sort={sort}
+                onSort={onSort}
+                onRowClick={(id) => setSelectedId(id)}
+              />
 
               {/* Load more */}
               {nextCursor && (
@@ -383,20 +454,18 @@ function CatalogPageContent() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ProductGridSkeleton() {
+function TableSkeleton() {
   return (
-    <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm"
-        >
-          <div className="aspect-square w-full bg-foreground/[0.05] animate-pulse" />
-          <div className="p-3 flex flex-col gap-2">
-            <div className="h-2.5 w-1/3 rounded bg-foreground/[0.05] animate-pulse" />
-            <div className="h-3.5 w-full rounded bg-foreground/[0.05] animate-pulse" />
+    <div className="overflow-hidden rounded-2xl border border-border/[0.08] bg-card shadow-sm">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className="grid grid-cols-[minmax(0,1fr)_92px_120px_120px_96px_132px] items-center gap-3 border-b border-border/[0.04] px-4 py-3.5">
+          <div className="flex flex-col gap-1.5">
+            <div className="h-2.5 w-1/4 rounded bg-foreground/[0.05] animate-pulse" />
             <div className="h-3 w-2/3 rounded bg-foreground/[0.05] animate-pulse" />
           </div>
+          {Array.from({ length: 5 }).map((__, j) => (
+            <div key={j} className="h-3 w-3/4 rounded bg-foreground/[0.05] animate-pulse" />
+          ))}
         </div>
       ))}
     </div>

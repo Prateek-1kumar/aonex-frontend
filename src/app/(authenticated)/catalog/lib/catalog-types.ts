@@ -49,6 +49,13 @@ export interface ListCatalogProductRow {
   completenessScore: number | null;
   /** LLM content-quality score (0..100); null until enrichment sets it. */
   contentQualityScore: number | null;
+  /** Grounding rate (0..1) of the latest enrichment proposal; null if never enriched. */
+  groundingRate: number | null;
+  /** Per-grounding field counts from the latest proposal (provenance dots). */
+  provenance: { grounded: number; weak: number; inferred: number; unverified: number; contradicted: number } | null;
+  /** Accepted (auto-applied) attrs vs total spec fields the latest proposal touched. */
+  attrsFilled: number | null;
+  attrsTotal: number | null;
   _meta: { schema: "new" };
 }
 
