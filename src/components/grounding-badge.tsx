@@ -1,9 +1,9 @@
 "use client";
 
-import { ShieldCheck, ShieldAlert, HelpCircle, AlertTriangle } from "lucide-react";
+import { ShieldCheck, ShieldAlert, HelpCircle, AlertTriangle, ShieldX } from "lucide-react";
 
 export interface GroundingBadgeProps {
-  /** "grounded" | "weak" | "inferred" | "contradicted" */
+  /** "grounded" | "weak" | "inferred" | "unverified" | "contradicted" */
   grounding: string;
   /** 0..1 — when present, shown as "· 82%" */
   support?: number | undefined;
@@ -32,6 +32,11 @@ const GROUNDING_MAP: Record<string, GroundingSpec> = {
     colorClasses: "text-muted-foreground bg-surface",
     Icon: HelpCircle,
   },
+  unverified: {
+    label: "Unverified",
+    colorClasses: "text-danger/80 bg-danger/[0.06]",
+    Icon: ShieldX,
+  },
   contradicted: {
     label: "Contradicted",
     colorClasses: "text-danger bg-danger/10",
@@ -44,6 +49,19 @@ const FALLBACK: GroundingSpec = {
   colorClasses: "text-muted-foreground bg-surface",
   Icon: HelpCircle,
 };
+
+/** Left-edge / background tone for a field row, keyed on grounding — kept in sync
+ *  with the badge palette so the row treatment and the badge always agree. */
+export function groundingTone(grounding: string): string {
+  switch (grounding) {
+    case "grounded": return "border-l-success/60";
+    case "weak": return "border-l-warning/60";
+    case "inferred": return "border-l-muted-foreground/30";
+    case "unverified": return "border-l-danger/50";
+    case "contradicted": return "border-l-danger";
+    default: return "border-l-border/40";
+  }
+}
 
 export default function GroundingBadge({ grounding, support, className }: GroundingBadgeProps) {
   const spec = GROUNDING_MAP[grounding] ?? FALLBACK;

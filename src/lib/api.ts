@@ -301,11 +301,13 @@ export interface ProposalFieldView {
   decision: "pending" | "accept" | "reject" | "edit";
   editedValue?: unknown;
   /** Grounding strength from PersistedProposalField */
-  grounding?: "grounded" | "weak" | "inferred" | "contradicted" | string;
+  grounding?: "grounded" | "weak" | "inferred" | "unverified" | "contradicted" | string;
   /** 0..1 grounding support score */
   support?: number;
   /** Source evidence snippet */
   evidence?: string;
+  /** Cross-field consistency conflict note, when the value was flagged. */
+  consistencyNote?: string;
   /** True when auto-applied by the worker (already committed) */
   accepted?: boolean;
   /** True when eligible for human review */
