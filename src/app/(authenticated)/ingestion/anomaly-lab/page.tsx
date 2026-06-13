@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useMemo, useState, Suspense } from "react";
 import {
   CheckCircle2, AlertCircle, Loader2, RefreshCw, Search, Package, ChevronRight,
-  FlaskConical, AlertTriangle, Link2,
+  FlaskConical, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatPrice, formatRelativeTime } from "@/lib/format";
@@ -74,7 +74,7 @@ function AnomalyLabPageContent() {
     if (idParam) {
       const url = new URL(window.location.href);
       url.searchParams.delete("id");
-      router.replace(url.pathname + url.search);
+      router.replace(url.pathname + url.search, { scroll: false });
     }
   }, [router, idParam]);
 
@@ -85,7 +85,7 @@ function AnomalyLabPageContent() {
       if (idParam === id) {
         const url = new URL(window.location.href);
         url.searchParams.delete("id");
-        router.replace(url.pathname + url.search);
+        router.replace(url.pathname + url.search, { scroll: false });
       }
       showToast({ type: "success", message });
       // Refresh the breakdown chips in the background — non-blocking.
@@ -109,12 +109,11 @@ function AnomalyLabPageContent() {
   );
 
   const kpis = useMemo(() => {
-    let ready = 0, needsInfo = 0, withMatch = 0;
+    let ready = 0, needsInfo = 0;
     for (const i of queue) {
       if (i.missingFields.length === 0) ready += 1; else needsInfo += 1;
-      if (i.candidateCount > 0) withMatch += 1;
     }
-    return { awaiting: stats?.total ?? queue.length, ready, needsInfo, withMatch };
+    return { awaiting: stats?.total ?? queue.length, ready, needsInfo };
   }, [queue, stats]);
 
   return (
@@ -122,9 +121,9 @@ function AnomalyLabPageContent() {
       {/* Header */}
       <PageHero
         icon={<FlaskConical size={22} strokeWidth={1.6} />}
-        eyebrow="Review Queue"
+        eyebrow="Ingestion"
         title="Anomaly Lab"
-        description="Inspect staged products that need a human check, complete what's missing, then push them to the catalog or link to an existing SKU."
+        description="Inspect staged products that need a human check, complete what's missing, then push them to the catalog. Categories are assigned automatically at ingestion."
         actions={
           <button
             onClick={() => void load()}
@@ -136,16 +135,12 @@ function AnomalyLabPageContent() {
           </button>
         }
       >
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard icon={<Package size={16} />} label="Awaiting" value={kpis.awaiting} tone="primary" />
           <StatCard icon={<CheckCircle2 size={16} />} label="Ready" value={kpis.ready} tone="success" />
           <StatCard icon={<AlertTriangle size={16} />} label="Needs Info" value={kpis.needsInfo} tone="warning" />
-          <StatCard icon={<Link2 size={16} />} label="Has Match" value={kpis.withMatch} tone="muted" />
         </div>
       </PageHero>
-
-      {/* Summary */}
-      <QueueStatsHeader stats={stats} count={stats?.total ?? queue.length} />
 
       {/* Toast */}
       {toast && (
@@ -158,54 +153,60 @@ function AnomalyLabPageContent() {
         </div>
       )}
 
-      {/* Search */}
-      {queue.length > 0 && (
-        <div className="relative max-w-md">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, brand, source…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
-          />
-        </div>
-      )}
+      {/* ── Review Queue ────────────────────────────────────────────────────── */}
+      <>
+          {/* Summary */}
+          <QueueStatsHeader stats={stats} count={stats?.total ?? queue.length} />
 
-      {/* List */}
-      {loading && queue.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 size={26} className="animate-spin text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">Loading queue…</p>
-        </div>
-      ) : queue.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border/[0.08] bg-card py-24 text-center shadow-sm">
-          <div className="relative mb-5">
-            <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--success)/0.5),transparent_70%)] opacity-60 blur-lg" />
-            <div className="relative grid size-14 place-items-center rounded-2xl border border-success/25 bg-success/10 text-success">
-              <CheckCircle2 size={26} strokeWidth={1.6} />
+          {/* Search */}
+          {queue.length > 0 && (
+            <div className="relative max-w-md">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title, brand, source…"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-border/[0.08] text-sm text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+              />
             </div>
-          </div>
-          <p className="font-serif text-lg font-semibold text-foreground/80">All clear — nothing staged</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            New items appear here when ingestion needs your review before publishing.
-          </p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-border/[0.08] bg-card p-12 text-center shadow-sm">
-          <p className="font-serif text-lg font-semibold text-foreground/80">Nothing matches “{search}”.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Try a different search.</p>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
-          {filtered.map((item) => (
-            <QueueRow
-              key={item.stagedProductId}
-              item={item}
-              onClick={() => setSelectedId(item.stagedProductId)}
-            />
-          ))}
-        </div>
-      )}
+          )}
+
+          {/* List */}
+          {loading && queue.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <Loader2 size={26} className="animate-spin text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Loading queue…</p>
+            </div>
+          ) : queue.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-border/[0.08] bg-card py-24 text-center shadow-sm">
+              <div className="relative mb-5">
+                <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle,hsl(var(--success)/0.5),transparent_70%)] opacity-60 blur-lg" />
+                <div className="relative grid size-14 place-items-center rounded-2xl border border-success/25 bg-success/10 text-success">
+                  <CheckCircle2 size={26} strokeWidth={1.6} />
+                </div>
+              </div>
+              <p className="font-serif text-lg font-semibold text-foreground/80">All clear — nothing staged</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                New items appear here when ingestion needs your review before publishing.
+              </p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-2xl border border-border/[0.08] bg-card p-12 text-center shadow-sm">
+              <p className="font-serif text-lg font-semibold text-foreground/80">Nothing matches &ldquo;{search}&rdquo;.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Try a different search.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border/[0.08] bg-card overflow-hidden shadow-sm">
+              {filtered.map((item) => (
+                <QueueRow
+                  key={item.stagedProductId}
+                  item={item}
+                  onClick={() => setSelectedId(item.stagedProductId)}
+                />
+              ))}
+            </div>
+          )}
+      </>
 
       {/* Review modal */}
       {selectedId && selectedItem && (

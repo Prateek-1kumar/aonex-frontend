@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2, RefreshCw, CheckCircle2, AlertCircle, ArrowRight, Sparkles, ChevronRight,
-  ChevronLeft, Wand2, GitCommitVertical, TrendingUp,
+  ChevronLeft, Wand2, GitCommitVertical, TrendingUp, ShieldCheck,
 } from "lucide-react";
 import {
   api,
@@ -15,8 +15,11 @@ import {
   type EnrichFieldDecision,
 } from "@/lib/api";
 import { PageHero, StatCard } from "@/components/ui/page-chrome";
-import { asImageUrls, ThumbStrip } from "@/components/ui/value-display";
+import { asImageUrls, ThumbStrip, ContentValue } from "@/components/ui/value-display";
 import { loadCatalogTitles } from "@/lib/catalog-titles";
+import CategoryBreadcrumb from "@/components/category-breadcrumb";
+import GroundingBadge from "@/components/grounding-badge";
+import { useCategoryPaths } from "@/app/(authenticated)/enrichment/lib/category-paths";
 
 type Toast = { type: "success" | "error"; message: string } | null;
 
@@ -45,6 +48,14 @@ function afterValue(f: ProposalFieldView): unknown {
   return f.decision === "edit" && f.editedValue !== undefined ? f.editedValue : f.after;
 }
 
+// ── Compact category path display ────────────────────────────────────────────
+function ArchetypePath({ nodeId, resolve }: { nodeId: string | null | undefined; resolve: (id: string | null | undefined) => string }) {
+  if (!nodeId) return <span className="text-muted-foreground/50">generic</span>;
+  const path = resolve(nodeId);
+  if (!path) return <span className="text-muted-foreground/50">generic</span>;
+  return <CategoryBreadcrumb displayPath={path} className="text-[11px]" />;
+}
+
 export default function ReviewCommitPage() {
   const [list, setList] = useState<ProposalListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +64,8 @@ export default function ReviewCommitPage() {
   const [toast, setToast] = useState<Toast>(null);
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { resolve: resolvePath } = useCategoryPaths();
 
   const showToast = useCallback((t: Toast) => {
     setToast(t);
@@ -165,11 +178,12 @@ export default function ReviewCommitPage() {
                 <button key={p.proposalId} onClick={() => void openDetail(p)} disabled={opening !== null} className="w-full grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-3.5 items-center text-left hover:bg-surface-hover transition-colors disabled:opacity-60">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground/90 truncate">{titleOf(p) ?? <span className="italic text-muted-foreground/50">Untitled product</span>}</p>
-                    <p className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
-                      <span className="uppercase tracking-wider">{p.archetype ?? "generic"}</span>
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground/55">
+                      {/* Archetype as compact category path */}
+                      <ArchetypePath nodeId={p.archetype} resolve={resolvePath} />
                       <span>· {p.fieldCount} fields</span>
                       {p.candidateCount > 0 && <span className="inline-flex items-center gap-1 text-primary"><Sparkles size={11} /> {p.candidateCount} new</span>}
-                    </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 rounded-lg border border-border/[0.08] bg-surface px-2.5 py-1.5">
                     <span className="text-sm font-bold tabular-nums text-muted-foreground/60">{before}</span>
@@ -205,17 +219,23 @@ function ReviewDetail({
   onError: (m: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { resolve: resolvePath } = useCategoryPaths();
+
   const accepted = proposal.fields.filter((f) => f.decision === "accept" || f.decision === "edit");
   const acceptedCandidates = proposal.candidates.filter((c) => c.decision === "accept");
   const before = Math.round(proposal.scoreBefore?.completeness ?? 0);
   const after = Math.round(proposal.scoreAfter?.completeness ?? 0);
   const delta = after - before;
+  const groundingRate = proposal.scoreAfter?.groundingRate;
+  const autoAppliedScore = proposal.scoreAfter?.autoApplied;
 
   const title =
     (proposal.fields.find((f) => f.attributeCode === "title" && (f.decision === "accept" || f.decision === "edit")) &&
       String(afterValue(proposal.fields.find((f) => f.attributeCode === "title")!))) ||
     fallbackTitle ||
     "Product";
+
+  const archetypeDisplayPath = proposal.archetype ? resolvePath(proposal.archetype) : null;
 
   async function handleSync() {
     setBusy(true);
@@ -242,7 +262,20 @@ function ReviewDetail({
 
       <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/45">Review Commit</p>
       <h1 className="mt-1 font-serif text-3xl font-bold text-foreground/95">{title}</h1>
-      <p className="mt-1 text-xs text-muted-foreground/55 uppercase tracking-wider">{proposal.archetype ?? "generic"}{proposal.model ? ` · ${proposal.model}` : ""}</p>
+      {/* Archetype as category breadcrumb instead of raw uppercase slug */}
+      <div className="mt-1">
+        {archetypeDisplayPath ? (
+          <CategoryBreadcrumb
+            displayPath={archetypeDisplayPath}
+            className="text-xs text-muted-foreground/60"
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground/55">generic</span>
+        )}
+        {proposal.model && (
+          <span className="ml-2 text-xs text-muted-foreground/40">· {proposal.model}</span>
+        )}
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Accepted changes */}
@@ -252,23 +285,34 @@ function ReviewDetail({
           </p>
           <div className="space-y-3">
             {accepted.map((f) => {
-              const after = afterValue(f);
-              const afterImgs = asImageUrls(after);
+              const afterVal = afterValue(f);
+              const afterImgs = asImageUrls(afterVal);
               const beforeImgs = asImageUrls(f.before);
               const hasBefore = f.before != null && f.before !== "";
               return (
                 <div key={f.attributeCode} className="rounded-xl border border-border/[0.08] bg-card p-4">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">{GROUP_LABEL[f.group]} · {humanize(f.attributeCode)}</span>
-                    <span className="text-[10px] font-semibold text-success">{Math.round(f.confidence * 100)}%</span>
+                    <div className="flex items-center gap-2">
+                      {/* Grounding badge on accepted change cards */}
+                      {f.grounding && (
+                        <GroundingBadge grounding={f.grounding} support={f.support} />
+                      )}
+                      <span className="text-[10px] font-semibold text-success">{Math.round(f.confidence * 100)}%</span>
+                    </div>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {afterImgs ? (
                       <ThumbStrip urls={afterImgs} />
+                    ) : f.kind === "content" ? (
+                      <div className="flex items-start gap-2">
+                        <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
+                        <div className="min-w-0 flex-1"><ContentValue value={afterVal} /></div>
+                      </div>
                     ) : (
                       <p className="flex items-start gap-2 text-sm text-primary/90 break-words whitespace-pre-wrap line-clamp-4">
                         <ArrowRight size={13} className="mt-0.5 shrink-0 text-primary/60" />
-                        {renderVal(after)}
+                        {renderVal(afterVal)}
                       </p>
                     )}
                     {hasBefore && (
@@ -282,6 +326,12 @@ function ReviewDetail({
                           <span className="line-through line-clamp-2 break-words">{renderVal(f.before)}</span>
                         </p>
                       )
+                    )}
+                    {/* Evidence snippet */}
+                    {f.evidence && (
+                      <p className="text-[11px] italic text-muted-foreground/45 line-clamp-2">
+                        &ldquo;{f.evidence}&rdquo;
+                      </p>
                     )}
                   </div>
                 </div>
@@ -331,6 +381,19 @@ function ReviewDetail({
                 Content quality{" "}
                 <span className="font-bold text-foreground/80 tabular-nums">{Math.round(proposal.scoreAfter.contentQuality)}</span>
                 <span className="text-muted-foreground/40">/100</span>
+              </p>
+            )}
+            {/* Grounding rate */}
+            {groundingRate != null && (
+              <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-success/80">
+                <ShieldCheck size={12} /> Grounding {Math.round(groundingRate * 100)}%
+              </p>
+            )}
+            {/* Auto-applied baseline score */}
+            {autoAppliedScore != null && (
+              <p className="mt-1 text-[11px] text-muted-foreground/50">
+                Auto-applied baseline{" "}
+                <span className="font-bold text-foreground/70 tabular-nums">{Math.round(autoAppliedScore)}</span>
               </p>
             )}
           </div>

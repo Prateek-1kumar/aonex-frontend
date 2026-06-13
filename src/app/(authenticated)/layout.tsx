@@ -56,9 +56,13 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     // sidebar width — so it's a plain block whose auto width fills 100vw − sidebar.
     <div className="min-h-screen bg-background">
       <AppSidebar />
-      <div className="flex min-h-screen flex-col ml-[var(--sidebar-width)]">
+      {/* h-screen + min-h-0 makes <main> the internal scroll container (its
+          overflow-auto/scrollbar-thin already intend this). Without a fixed
+          height the column grows and the WINDOW scrolls instead, which silently
+          breaks every position:sticky inside main (e.g. the catalog rail). */}
+      <div className="flex h-screen flex-col ml-[var(--sidebar-width)]">
         <TopBar tabs={tabs} />
-        <main className="flex-1 overflow-auto scrollbar-thin p-8">
+        <main className="flex-1 min-h-0 overflow-auto scrollbar-thin p-8">
           {children}
         </main>
       </div>
